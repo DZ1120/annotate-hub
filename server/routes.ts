@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProjectSchema } from "@shared/schema";
+import path from "path";
+import fs from "fs";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -63,6 +65,17 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete project" });
+    }
+  });
+
+  app.get("/api/download-package", (req, res) => {
+    const filePath = path.join(process.cwd(), "image-annotator.tar.gz");
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Content-Disposition", "attachment; filename=image-annotator.tar.gz");
+      res.setHeader("Content-Type", "application/gzip");
+      fs.createReadStream(filePath).pipe(res);
+    } else {
+      res.status(404).json({ error: "Package not found" });
     }
   });
 
