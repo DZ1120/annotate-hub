@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import type { Project, Annotation, AnnotationPoint, TextNote, Shape } from "@shared/schema";
+import type { Project, Annotation, AnnotationPoint, TextNote, Shape, DefaultPointSettings } from "@shared/schema";
 
 export type ToolType = "select" | "point" | "text" | "rectangle" | "circle" | "line" | "arrow";
 
-export interface AnnotationWithVisibility extends Annotation {
+export type AnnotationWithVisibility = Annotation & {
   visible?: boolean;
   locked?: boolean;
-}
+};
 
 export function useAnnotationStore() {
   const [project, setProject] = useState<Project>({
@@ -16,6 +16,10 @@ export function useAnnotationStore() {
     zoom: 1,
     panX: 0,
     panY: 0,
+    defaultPointSettings: {
+      size: 32,
+      color: "#3b82f6",
+    },
   });
   
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
@@ -133,28 +137,45 @@ export function useAnnotationStore() {
     });
   }, []);
 
+  const setDefaultPointSettings = useCallback((settings: Partial<DefaultPointSettings>) => {
+    setProject(prev => ({
+      ...prev,
+      defaultPointSettings: {
+        ...prev.defaultPointSettings,
+        ...settings,
+      } as DefaultPointSettings,
+    }));
+  }, []);
+
   const createPoint = useCallback((x: number, y: number): AnnotationPoint => {
+    const defaults = project.defaultPointSettings || { size: 32, color: "#3b82f6" };
     return {
       id: crypto.randomUUID(),
       type: "point",
       x,
       y,
       number: nextPointNumber,
-      size: 32,
-      color: "#3b82f6",
+      size: defaults.size,
+      color: defaults.color,
     };
-  }, [nextPointNumber]);
+  }, [nextPointNumber, project.defaultPointSettings]);
 
-  const createTextNote = useCallback((x: number, y: number): TextNote => {
+  const createTextNote = useCallback((x: number, y: number, width?: number, height?: number): TextNote => {
     return {
       id: crypto.randomUUID(),
       type: "text",
       x,
       y,
-      width: 200,
-      height: 100,
+      width: width || 200,
+      height: height || 100,
       content: "",
       fontSize: 14,
+      fontWeight: "normal",
+      textColor: "#000000",
+      backgroundColor: "#ffffff",
+      backgroundOpacity: 1,
+      borderColor: "#e5e7eb",
+      borderWidth: 1,
     };
   }, []);
 
@@ -181,11 +202,33 @@ export function useAnnotationStore() {
       zoom: 1,
       panX: 0,
       panY: 0,
+      defaultPointSettings: {
+        size: 32,
+        color: "#3b82f6",
+      },
     });
     setNextPointNumber(1);
     setSelectedAnnotationId(null);
     setVisibilityMap({});
     setLockedMap({});
+  }, []);
+
+  const importProject = useCallback((importedProject: Project) => {
+    setProject(importedProject);
+    setNextPointNumber(
+      Math.max(1, ...importedProject.annotations
+        .filter(a => a.type === "point")
+        .map(a => (a as AnnotationPoint).number + 1))
+    );
+    setSelectedAnnotationId(null);
+    const newVisibilityMap: Record<string, boolean> = {};
+    const newLockedMap: Record<string, boolean> = {};
+    importedProject.annotations.forEach(a => {
+      newVisibilityMap[a.id] = true;
+      newLockedMap[a.id] = false;
+    });
+    setVisibilityMap(newVisibilityMap);
+    setLockedMap(newLockedMap);
   }, []);
 
   return {
@@ -213,6 +256,8 @@ export function useAnnotationStore() {
     isVisible,
     isLocked,
     moveAnnotation,
+    setDefaultPointSettings,
+    importProject,
   };
 }
 

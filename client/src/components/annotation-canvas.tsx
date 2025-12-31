@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Upload, ImageIcon } from "lucide-react";
+import { Upload, ImageIcon, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import type { AnnotationStore, ToolType } from "@/lib/annotation-store";
@@ -19,6 +19,8 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [resizing, setResizing] = useState<{ id: string; handle: string } | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; annotation: Annotation } | null>(null);
   
   const { 
     project, 
@@ -70,8 +72,9 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     }
 
     if (selectedTool === "text" && project.backgroundImage) {
-      const text = createTextNote(coords.x, coords.y);
-      addAnnotation(text);
+      setIsDrawing(true);
+      setDrawStart(coords);
+      setTempShape({ x: coords.x, y: coords.y, width: 0, height: 0 });
       return;
     }
 
@@ -80,11 +83,45 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       setDrawStart(coords);
       setTempShape({ x: coords.x, y: coords.y, width: 0, height: 0 });
     }
-  }, [selectedTool, project.backgroundImage, getCanvasCoords, createPoint, createTextNote, addAnnotation, isSpacePressed]);
+  }, [selectedTool, project.backgroundImage, getCanvasCoords, createPoint, addAnnotation, isSpacePressed]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
       setPan(project.panX + e.movementX, project.panY + e.movementY);
+      return;
+    }
+
+    if (resizing && resizeStart) {
+      const coords = getCanvasCoords(e);
+      const annotation = resizeStart.annotation;
+      
+      if (annotation.type === "shape" || annotation.type === "text") {
+        const dx = coords.x - resizeStart.x;
+        const dy = coords.y - resizeStart.y;
+        
+        let newWidth = annotation.width;
+        let newHeight = annotation.height;
+        let newX = annotation.x;
+        let newY = annotation.y;
+        
+        if (resizing.handle.includes("e")) {
+          newWidth = Math.max(20, annotation.width + dx);
+        }
+        if (resizing.handle.includes("w")) {
+          newWidth = Math.max(20, annotation.width - dx);
+          newX = annotation.x + dx;
+        }
+        if (resizing.handle.includes("s")) {
+          newHeight = Math.max(20, annotation.height + dy);
+        }
+        if (resizing.handle.includes("n")) {
+          newHeight = Math.max(20, annotation.height - dy);
+          newY = annotation.y + dy;
+        }
+        
+        updateAnnotation(resizing.id, { x: newX, y: newY, width: newWidth, height: newHeight });
+        setResizeStart({ ...resizeStart, x: coords.x, y: coords.y, annotation: { ...annotation, x: newX, y: newY, width: newWidth, height: newHeight } as Annotation });
+      }
       return;
     }
 
@@ -106,11 +143,17 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
         height: Math.abs(coords.y - drawStart.y),
       });
     }
-  }, [isPanning, isDrawing, drawStart, draggedId, dragOffset, getCanvasCoords, setPan, project.panX, project.panY, updateAnnotation]);
+  }, [isPanning, isDrawing, drawStart, draggedId, dragOffset, getCanvasCoords, setPan, project.panX, project.panY, updateAnnotation, resizing, resizeStart]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
       setIsPanning(false);
+      return;
+    }
+
+    if (resizing) {
+      setResizing(null);
+      setResizeStart(null);
       return;
     }
 
@@ -119,16 +162,23 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       return;
     }
 
-    if (isDrawing && tempShape && tempShape.width > 5 && tempShape.height > 5) {
-      const shapeType = selectedTool as Shape["shapeType"];
-      const shape = createShape(shapeType, tempShape.x, tempShape.y, tempShape.width, tempShape.height);
-      addAnnotation(shape);
+    if (isDrawing && tempShape) {
+      if (selectedTool === "text") {
+        const width = tempShape.width > 30 ? tempShape.width : 200;
+        const height = tempShape.height > 20 ? tempShape.height : 100;
+        const text = createTextNote(tempShape.x, tempShape.y, width, height);
+        addAnnotation(text);
+      } else if (tempShape.width > 5 && tempShape.height > 5) {
+        const shapeType = selectedTool as Shape["shapeType"];
+        const shape = createShape(shapeType, tempShape.x, tempShape.y, tempShape.width, tempShape.height);
+        addAnnotation(shape);
+      }
     }
 
     setIsDrawing(false);
     setDrawStart(null);
     setTempShape(null);
-  }, [isPanning, isDrawing, tempShape, selectedTool, createShape, addAnnotation, draggedId]);
+  }, [isPanning, isDrawing, tempShape, selectedTool, createTextNote, createShape, addAnnotation, draggedId, resizing]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === containerRef.current && selectedTool === "select") {
@@ -154,6 +204,15 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     }
   }, [selectedTool, getCanvasCoords, setSelectedAnnotationId, isLocked, isSpacePressed]);
 
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent, annotation: Annotation, handle: string) => {
+    e.stopPropagation();
+    if (isLocked(annotation.id)) return;
+    
+    const coords = getCanvasCoords(e);
+    setResizing({ id: annotation.id, handle });
+    setResizeStart({ x: coords.x, y: coords.y, annotation });
+  }, [getCanvasCoords, isLocked]);
+
   const handlePointClick = useCallback((e: React.MouseEvent, annotation: Annotation) => {
     e.stopPropagation();
     
@@ -174,6 +233,9 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       if (e.key === "Escape") {
         setSelectedAnnotationId(null);
         setImagePreview(null);
+      }
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
+        return;
       }
       if (e.key === "v" || e.key === "V") {
         store.setSelectedTool("select");
@@ -202,64 +264,156 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedAnnotationId, store, setSelectedAnnotationId, isLocked]);
 
+  const renderResizeHandles = (annotation: Annotation) => {
+    if (annotation.id !== selectedAnnotationId) return null;
+    if (annotation.type === "point") return null;
+    if (isLocked(annotation.id)) return null;
+
+    const handleSize = 8;
+    const handles = ["nw", "ne", "sw", "se", "n", "s", "e", "w"];
+    
+    let width: number;
+    let height: number;
+    
+    if (annotation.type === "text") {
+      width = annotation.width;
+      height = annotation.height;
+    } else {
+      width = annotation.width;
+      height = annotation.height;
+    }
+
+    return handles.map(handle => {
+      let x = 0;
+      let y = 0;
+      let cursor = "";
+      
+      if (handle.includes("w")) x = -handleSize / 2;
+      if (handle.includes("e")) x = width * project.zoom - handleSize / 2;
+      if (handle === "n" || handle === "s") x = (width * project.zoom) / 2 - handleSize / 2;
+      
+      if (handle.includes("n")) y = -handleSize / 2;
+      if (handle.includes("s")) y = height * project.zoom - handleSize / 2;
+      if (handle === "e" || handle === "w") y = (height * project.zoom) / 2 - handleSize / 2;
+
+      if (handle === "nw" || handle === "se") cursor = "nwse-resize";
+      if (handle === "ne" || handle === "sw") cursor = "nesw-resize";
+      if (handle === "n" || handle === "s") cursor = "ns-resize";
+      if (handle === "e" || handle === "w") cursor = "ew-resize";
+
+      return (
+        <div
+          key={handle}
+          className="absolute bg-primary border-2 border-primary-foreground rounded-sm"
+          style={{
+            width: handleSize,
+            height: handleSize,
+            left: x,
+            top: y,
+            cursor,
+          }}
+          onMouseDown={(e) => handleResizeMouseDown(e, annotation, handle)}
+        />
+      );
+    });
+  };
+
   const renderAnnotation = (annotation: Annotation) => {
     if (!isVisible(annotation.id)) return null;
     
     const isSelected = annotation.id === selectedAnnotationId;
     const locked = isLocked(annotation.id);
-    const style = {
-      left: annotation.x * project.zoom + project.panX,
-      top: annotation.y * project.zoom + project.panY,
-      transform: `translate(-50%, -50%) scale(${project.zoom})`,
-    };
 
     if (annotation.type === "point") {
+      const style = {
+        left: annotation.x * project.zoom + project.panX,
+        top: annotation.y * project.zoom + project.panY,
+        transform: `translate(-50%, -50%)`,
+      };
+
       return (
         <div
           key={annotation.id}
-          className={`absolute cursor-pointer transition-transform duration-100 ${isSelected ? "ring-2 ring-offset-2 ring-ring rounded-full" : ""} ${locked ? "cursor-not-allowed opacity-75" : ""}`}
-          style={{
-            ...style,
-            width: annotation.size,
-            height: annotation.size,
-            backgroundColor: annotation.color,
-          }}
+          className={`absolute cursor-pointer ${isSelected ? "z-10" : ""} ${locked ? "cursor-not-allowed opacity-75" : ""}`}
+          style={style}
           onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
           onClick={(e) => handlePointClick(e, annotation)}
           data-testid={`point-${annotation.id}`}
         >
           <div 
-            className="absolute inset-0 flex items-center justify-center text-white font-bold rounded-full"
-            style={{ fontSize: annotation.size * 0.4 }}
+            className="relative flex items-center justify-center rounded-full shadow-md"
+            style={{ 
+              width: annotation.size * project.zoom, 
+              height: annotation.size * project.zoom,
+              backgroundColor: annotation.color,
+            }}
           >
-            {annotation.number}
+            <span 
+              className="text-white font-bold"
+              style={{ fontSize: annotation.size * project.zoom * 0.4 }}
+            >
+              {annotation.number}
+            </span>
+            {annotation.attachedImageUrl && (
+              <div 
+                className="absolute -top-1 -right-1 bg-green-500 rounded-full border-2 border-white"
+                style={{ width: 12 * project.zoom, height: 12 * project.zoom }}
+              />
+            )}
           </div>
-          {annotation.attachedImageUrl && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+          {isSelected && (
+            <div 
+              className="absolute rounded-full border-2 border-primary pointer-events-none"
+              style={{
+                width: annotation.size * project.zoom + 8,
+                height: annotation.size * project.zoom + 8,
+                left: -4,
+                top: -4,
+              }}
+            />
           )}
         </div>
       );
     }
 
     if (annotation.type === "text") {
+      const bgColor = annotation.backgroundColor || "#ffffff";
+      const bgOpacity = annotation.backgroundOpacity ?? 1;
+      
       return (
         <div
           key={annotation.id}
-          className={`absolute bg-card border rounded-md shadow-md p-2 ${locked ? "cursor-not-allowed" : "cursor-move"} ${isSelected ? "ring-2 ring-ring" : ""}`}
+          className={`absolute ${locked ? "cursor-not-allowed" : "cursor-move"}`}
           style={{
             left: annotation.x * project.zoom + project.panX,
             top: annotation.y * project.zoom + project.panY,
             width: annotation.width * project.zoom,
             minHeight: annotation.height * project.zoom,
-            fontSize: annotation.fontSize * project.zoom,
             transformOrigin: "top left",
           }}
           onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
           data-testid={`text-${annotation.id}`}
         >
-          <p className="whitespace-pre-wrap break-words">
-            {annotation.content || <span className="text-muted-foreground italic">Empty note</span>}
-          </p>
+          <div
+            className="w-full h-full rounded-md shadow-md p-2"
+            style={{
+              backgroundColor: bgOpacity > 0 ? bgColor : "transparent",
+              opacity: bgOpacity,
+              border: `${annotation.borderWidth || 1}px solid ${annotation.borderColor || "#e5e7eb"}`,
+              fontSize: annotation.fontSize * project.zoom,
+              fontWeight: annotation.fontWeight || "normal",
+              color: annotation.textColor || "#000000",
+            }}
+          >
+            <p className="whitespace-pre-wrap break-words">
+              {annotation.content || <span className="italic opacity-50">Empty note</span>}
+            </p>
+          </div>
+          {isSelected && (
+            <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none" style={{ margin: -2 }}>
+              {renderResizeHandles(annotation)}
+            </div>
+          )}
         </div>
       );
     }
@@ -273,68 +427,75 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       };
 
       return (
-        <svg
+        <div
           key={annotation.id}
-          className={`absolute ${locked ? "cursor-not-allowed" : "cursor-move"} ${isSelected ? "outline outline-2 outline-ring outline-offset-2" : ""}`}
+          className={`absolute ${locked ? "cursor-not-allowed" : "cursor-move"}`}
           style={shapeStyle}
           onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
           data-testid={`shape-${annotation.id}`}
         >
-          {annotation.shapeType === "rectangle" && (
-            <rect
-              x={annotation.strokeWidth / 2}
-              y={annotation.strokeWidth / 2}
-              width={Math.max(0, annotation.width * project.zoom - annotation.strokeWidth)}
-              height={Math.max(0, annotation.height * project.zoom - annotation.strokeWidth)}
-              stroke={annotation.strokeColor}
-              strokeWidth={annotation.strokeWidth}
-              fill={annotation.fillColor || annotation.strokeColor}
-              fillOpacity={annotation.fillOpacity}
-            />
-          )}
-          {annotation.shapeType === "circle" && (
-            <ellipse
-              cx={annotation.width * project.zoom / 2}
-              cy={annotation.height * project.zoom / 2}
-              rx={Math.max(0, (annotation.width * project.zoom - annotation.strokeWidth) / 2)}
-              ry={Math.max(0, (annotation.height * project.zoom - annotation.strokeWidth) / 2)}
-              stroke={annotation.strokeColor}
-              strokeWidth={annotation.strokeWidth}
-              fill={annotation.fillColor || annotation.strokeColor}
-              fillOpacity={annotation.fillOpacity}
-            />
-          )}
-          {annotation.shapeType === "line" && (
-            <line
-              x1={0}
-              y1={annotation.height * project.zoom}
-              x2={annotation.width * project.zoom}
-              y2={0}
-              stroke={annotation.strokeColor}
-              strokeWidth={annotation.strokeWidth}
-            />
-          )}
-          {annotation.shapeType === "arrow" && (
-            <g>
+          <svg className="w-full h-full" style={{ overflow: "visible" }}>
+            {annotation.shapeType === "rectangle" && (
+              <rect
+                x={annotation.strokeWidth / 2}
+                y={annotation.strokeWidth / 2}
+                width={Math.max(0, annotation.width * project.zoom - annotation.strokeWidth)}
+                height={Math.max(0, annotation.height * project.zoom - annotation.strokeWidth)}
+                stroke={annotation.strokeColor}
+                strokeWidth={annotation.strokeWidth}
+                fill={annotation.fillColor || annotation.strokeColor}
+                fillOpacity={annotation.fillOpacity}
+              />
+            )}
+            {annotation.shapeType === "circle" && (
+              <ellipse
+                cx={annotation.width * project.zoom / 2}
+                cy={annotation.height * project.zoom / 2}
+                rx={Math.max(0, (annotation.width * project.zoom - annotation.strokeWidth) / 2)}
+                ry={Math.max(0, (annotation.height * project.zoom - annotation.strokeWidth) / 2)}
+                stroke={annotation.strokeColor}
+                strokeWidth={annotation.strokeWidth}
+                fill={annotation.fillColor || annotation.strokeColor}
+                fillOpacity={annotation.fillOpacity}
+              />
+            )}
+            {annotation.shapeType === "line" && (
               <line
                 x1={0}
-                y1={annotation.height * project.zoom / 2}
-                x2={annotation.width * project.zoom - 10}
-                y2={annotation.height * project.zoom / 2}
+                y1={annotation.height * project.zoom}
+                x2={annotation.width * project.zoom}
+                y2={0}
                 stroke={annotation.strokeColor}
                 strokeWidth={annotation.strokeWidth}
               />
-              <polygon
-                points={`
-                  ${annotation.width * project.zoom},${annotation.height * project.zoom / 2}
-                  ${annotation.width * project.zoom - 12},${annotation.height * project.zoom / 2 - 6}
-                  ${annotation.width * project.zoom - 12},${annotation.height * project.zoom / 2 + 6}
-                `}
-                fill={annotation.strokeColor}
-              />
-            </g>
+            )}
+            {annotation.shapeType === "arrow" && (
+              <g>
+                <line
+                  x1={0}
+                  y1={annotation.height * project.zoom / 2}
+                  x2={annotation.width * project.zoom - 10}
+                  y2={annotation.height * project.zoom / 2}
+                  stroke={annotation.strokeColor}
+                  strokeWidth={annotation.strokeWidth}
+                />
+                <polygon
+                  points={`
+                    ${annotation.width * project.zoom},${annotation.height * project.zoom / 2}
+                    ${annotation.width * project.zoom - 12},${annotation.height * project.zoom / 2 - 6}
+                    ${annotation.width * project.zoom - 12},${annotation.height * project.zoom / 2 + 6}
+                  `}
+                  fill={annotation.strokeColor}
+                />
+              </g>
+            )}
+          </svg>
+          {isSelected && (
+            <div className="absolute inset-0 border-2 border-primary pointer-events-none" style={{ margin: -2 }}>
+              {renderResizeHandles(annotation)}
+            </div>
           )}
-        </svg>
+        </div>
       );
     }
   };
@@ -348,6 +509,15 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       width: tempShape.width * project.zoom,
       height: tempShape.height * project.zoom,
     };
+
+    if (selectedTool === "text") {
+      return (
+        <div
+          className="absolute border-2 border-dashed border-primary bg-primary/10 rounded-md pointer-events-none"
+          style={style}
+        />
+      );
+    }
 
     return (
       <svg className="absolute pointer-events-none" style={style}>
@@ -403,6 +573,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
 
   const getCursor = () => {
     if (isPanning || isSpacePressed) return "grab";
+    if (resizing) return "grabbing";
     if (selectedTool === "select") return "default";
     if (selectedTool === "point") return "crosshair";
     if (selectedTool === "text") return "text";
