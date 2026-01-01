@@ -20,9 +20,9 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
 
   if (!selectedAnnotation) {
     return (
-      <aside className="w-72 border-l bg-card p-4 flex-shrink-0 overflow-y-auto">
-        <h2 className="text-base font-semibold mb-4">Properties</h2>
-        <p className="text-sm text-muted-foreground">
+      <aside className="w-64 border-l border-border/60 bg-card/95 backdrop-blur-sm p-3 flex-shrink-0 overflow-y-auto">
+        <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Properties</h2>
+        <p className="text-xs text-muted-foreground">
           Select an annotation to edit its properties
         </p>
       </aside>
@@ -32,16 +32,45 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
   const locked = isLocked(selectedAnnotation.id);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && selectedAnnotation.type === "point") {
+    const files = e.target.files;
+    if (!files || files.length === 0 || selectedAnnotation.type !== "point") return;
+    
+    const point = selectedAnnotation as AnnotationPoint;
+    const existingImages = point.attachedImageUrls || (point.attachedImageUrl ? [point.attachedImageUrl] : []);
+    
+    // Read all selected files
+    Array.from(files).forEach((file) => {
       const reader = new FileReader();
       reader.onload = (event) => {
-        updateAnnotation(selectedAnnotation.id, {
-          attachedImageUrl: event.target?.result as string,
-        });
+        const newImageUrl = event.target?.result as string;
+        // Get current images again in case of concurrent updates
+        const currentPoint = store.project.annotations.find(a => a.id === selectedAnnotation.id) as AnnotationPoint | undefined;
+        if (currentPoint) {
+          const currentImages = currentPoint.attachedImageUrls || (currentPoint.attachedImageUrl ? [currentPoint.attachedImageUrl] : []);
+          updateAnnotation(selectedAnnotation.id, {
+            attachedImageUrls: [...currentImages, newImageUrl],
+            attachedImageUrl: undefined, // Clear legacy field
+          });
+        }
       };
       reader.readAsDataURL(file);
+    });
+    
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
     }
+  };
+  
+  const removeImage = (index: number) => {
+    if (selectedAnnotation.type !== "point") return;
+    const point = selectedAnnotation as AnnotationPoint;
+    const images = point.attachedImageUrls || (point.attachedImageUrl ? [point.attachedImageUrl] : []);
+    const newImages = images.filter((_, i) => i !== index);
+    updateAnnotation(point.id, {
+      attachedImageUrls: newImages.length > 0 ? newImages : undefined,
+      attachedImageUrl: undefined,
+    });
   };
 
   const renderPointProperties = (point: AnnotationPoint) => (
@@ -114,49 +143,69 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
 
       <div className="space-y-2">
         <Label className="text-xs font-medium uppercase tracking-wide">
-          Attached Image
+          Attached Images
         </Label>
-        {point.attachedImageUrl ? (
-          <div className="space-y-2">
-            <div className="relative rounded-md overflow-hidden border">
-              <img
-                src={point.attachedImageUrl}
-                alt="Attached"
-                className="w-full h-32 object-cover"
-              />
+        
+        {/* Display existing images */}
+        {(() => {
+          const images = point.attachedImageUrls || (point.attachedImageUrl ? [point.attachedImageUrl] : []);
+          return images.length > 0 ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {images.map((url, index) => (
+                  <div key={index} className="relative group rounded-md overflow-hidden border">
+                    <img
+                      src={url}
+                      alt={`Attached ${index + 1}`}
+                      className="w-full h-20 object-cover"
+                    />
+                    <button
+                      onClick={() => removeImage(index)}
+                      disabled={locked}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:bg-red-600 disabled:opacity-50"
+                    >
+                      ×
+                    </button>
+                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-xs">
+                      {index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => !locked && imageInputRef.current?.click()}
+                disabled={locked}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Add More Images
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => updateAnnotation(point.id, { attachedImageUrl: undefined })}
-              disabled={locked}
-              data-testid="button-remove-attached-image"
+          ) : (
+            <div
+              onClick={() => !locked && imageInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-md p-6 text-center ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-accent/50"} transition-colors`}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Remove Image
-            </Button>
-          </div>
-        ) : (
-          <div
-            onClick={() => !locked && imageInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-md p-6 text-center ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover-elevate"} transition-colors`}
-          >
-            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Click to upload image
-            </p>
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-              disabled={locked}
-              data-testid="input-attach-image"
-            />
-          </div>
-        )}
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Click to upload images
+              </p>
+            </div>
+          );
+        })()}
+        
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+          className="hidden"
+          disabled={locked}
+          data-testid="input-attach-image"
+        />
       </div>
     </>
   );
@@ -504,24 +553,25 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
   );
 
   return (
-    <aside className="w-72 border-l bg-card p-4 flex-shrink-0 overflow-y-auto">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <h2 className="text-base font-semibold capitalize">
-          {selectedAnnotation.type} Properties
+    <aside className="w-64 border-l border-border/60 bg-card/95 backdrop-blur-sm p-3 flex-shrink-0 overflow-y-auto">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {selectedAnnotation.type}
         </h2>
         <Button
           variant="ghost"
           size="icon"
+          className="h-6 w-6"
           onClick={() => setSelectedAnnotationId(null)}
           data-testid="button-close-properties"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3 w-3" />
         </Button>
       </div>
 
       {locked && (
-        <div className="mb-4 p-2 rounded-md bg-muted text-sm text-muted-foreground">
-          This annotation is locked. Unlock it to edit.
+        <div className="mb-3 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
+          Locked. Unlock to edit.
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import type { Project, Annotation, AnnotationPoint, TextNote, Shape, DefaultPointSettings } from "@shared/schema";
+import type { Project, Annotation, AnnotationPoint, TextNote, Shape, DefaultPointSettings, BackgroundSettings } from "@shared/schema";
 
 export type ToolType = "select" | "point" | "text" | "rectangle" | "circle" | "line" | "arrow";
 
@@ -8,8 +8,80 @@ export type AnnotationWithVisibility = Annotation & {
   locked?: boolean;
 };
 
+const STORAGE_KEY = "image-annotator-project";
+const STORAGE_KEY_VISIBILITY = "image-annotator-visibility";
+const STORAGE_KEY_LOCKED = "image-annotator-locked";
+
+// Load project data from localStorage
+function loadProjectFromStorage(): Project | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored) as Project;
+    }
+  } catch (error) {
+    console.error("Failed to load project from storage:", error);
+  }
+  return null;
+}
+
+// Save project data to localStorage
+function saveProjectToStorage(project: Project) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+  } catch (error) {
+    console.error("Failed to save project to storage:", error);
+  }
+}
+
+// Load visibility map from localStorage
+function loadVisibilityMap(): Record<string, boolean> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_VISIBILITY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("Failed to load visibility map:", error);
+  }
+  return {};
+}
+
+// Save visibility map to localStorage
+function saveVisibilityMap(map: Record<string, boolean>) {
+  try {
+    localStorage.setItem(STORAGE_KEY_VISIBILITY, JSON.stringify(map));
+  } catch (error) {
+    console.error("Failed to save visibility map:", error);
+  }
+}
+
+// Load locked map from localStorage
+function loadLockedMap(): Record<string, boolean> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_LOCKED);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("Failed to load locked map:", error);
+  }
+  return {};
+}
+
+// Save locked map to localStorage
+function saveLockedMap(map: Record<string, boolean>) {
+  try {
+    localStorage.setItem(STORAGE_KEY_LOCKED, JSON.stringify(map));
+  } catch (error) {
+    console.error("Failed to save locked map:", error);
+  }
+}
+
 export function useAnnotationStore() {
-  const [project, setProject] = useState<Project>({
+  // Initialize by loading data from localStorage
+  const storedProject = loadProjectFromStorage();
+  const defaultProject: Project = storedProject || {
     id: crypto.randomUUID(),
     name: "Untitled Project",
     annotations: [],
@@ -20,16 +92,49 @@ export function useAnnotationStore() {
       size: 32,
       color: "#3b82f6",
     },
-  });
+  };
+
+  const [project, setProject] = useState<Project>(defaultProject);
   
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
-  const [nextPointNumber, setNextPointNumber] = useState(1);
-  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
-  const [lockedMap, setLockedMap] = useState<Record<string, boolean>>({});
+  
+  // Calculate next point number
+  const calculateNextPointNumber = useCallback((annotations: Annotation[]) => {
+    const pointAnnotations = annotations.filter(a => a.type === "point") as AnnotationPoint[];
+    if (pointAnnotations.length === 0) return 1;
+    return Math.max(...pointAnnotations.map(p => p.number)) + 1;
+  }, []);
+  
+  const [nextPointNumber, setNextPointNumber] = useState(() => 
+    calculateNextPointNumber(defaultProject.annotations)
+  );
+  
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>(() => 
+    loadVisibilityMap()
+  );
+  const [lockedMap, setLockedMap] = useState<Record<string, boolean>>(() => 
+    loadLockedMap()
+  );
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isEditingBackground, setIsEditingBackground] = useState(false);
 
   const selectedAnnotation = project.annotations.find(a => a.id === selectedAnnotationId) || null;
+
+  // Auto-save project data to localStorage when it changes
+  useEffect(() => {
+    saveProjectToStorage(project);
+  }, [project]);
+
+  // Save visibility map to localStorage when it changes
+  useEffect(() => {
+    saveVisibilityMap(visibilityMap);
+  }, [visibilityMap]);
+
+  // Save locked map to localStorage when it changes
+  useEffect(() => {
+    saveLockedMap(lockedMap);
+  }, [lockedMap]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,65 +157,143 @@ export function useAnnotationStore() {
   }, []);
 
   const setBackgroundImage = useCallback((url: string) => {
-    setProject(prev => ({ ...prev, backgroundImage: url }));
+    setProject(prev => {
+      const updated = { 
+        ...prev, 
+        backgroundImage: url,
+        backgroundSettings: {
+          rotation: 0,
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+        }
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
+  const updateBackgroundSettings = useCallback((settings: Partial<BackgroundSettings>) => {
+    setProject(prev => {
+      const currentSettings = prev.backgroundSettings || {
+        rotation: 0,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+      const updated = {
+        ...prev,
+        backgroundSettings: {
+          ...currentSettings,
+          ...settings,
+        },
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
+  }, []);
+
+  const toggleEditingBackground = useCallback(() => {
+    setIsEditingBackground(prev => !prev);
+    if (isEditingBackground) {
+      setSelectedAnnotationId(null);
+    }
+  }, [isEditingBackground]);
+
   const addAnnotation = useCallback((annotation: Annotation) => {
-    setProject(prev => ({
-      ...prev,
-      annotations: [...prev.annotations, annotation],
-    }));
+    setProject(prev => {
+      const updated = {
+        ...prev,
+        annotations: [...prev.annotations, annotation],
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
     if (annotation.type === "point") {
       setNextPointNumber(prev => prev + 1);
     }
     setSelectedAnnotationId(annotation.id);
-    setVisibilityMap(prev => ({ ...prev, [annotation.id]: true }));
-    setLockedMap(prev => ({ ...prev, [annotation.id]: false }));
+    setVisibilityMap(prev => {
+      const updated = { ...prev, [annotation.id]: true };
+      saveVisibilityMap(updated);
+      return updated;
+    });
+    setLockedMap(prev => {
+      const updated = { ...prev, [annotation.id]: false };
+      saveLockedMap(updated);
+      return updated;
+    });
   }, []);
 
   const updateAnnotation = useCallback((id: string, updates: Partial<Annotation>) => {
-    setProject(prev => ({
-      ...prev,
-      annotations: prev.annotations.map(a => 
-        a.id === id ? { ...a, ...updates } as Annotation : a
-      ),
-    }));
+    setProject(prev => {
+      const updated = {
+        ...prev,
+        annotations: prev.annotations.map(a => 
+          a.id === id ? { ...a, ...updates } as Annotation : a
+        ),
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const deleteAnnotation = useCallback((id: string) => {
-    setProject(prev => ({
-      ...prev,
-      annotations: prev.annotations.filter(a => a.id !== id),
-    }));
+    setProject(prev => {
+      const updated = {
+        ...prev,
+        annotations: prev.annotations.filter(a => a.id !== id),
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
     if (selectedAnnotationId === id) {
       setSelectedAnnotationId(null);
     }
     setVisibilityMap(prev => {
       const newMap = { ...prev };
       delete newMap[id];
+      saveVisibilityMap(newMap);
       return newMap;
     });
     setLockedMap(prev => {
       const newMap = { ...prev };
       delete newMap[id];
+      saveLockedMap(newMap);
       return newMap;
     });
   }, [selectedAnnotationId]);
 
   const setZoom = useCallback((zoom: number) => {
-    setProject(prev => ({ ...prev, zoom: Math.max(0.1, Math.min(5, zoom)) }));
+    setProject(prev => {
+      const updated = { ...prev, zoom: Math.max(0.1, Math.min(5, zoom)) };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const setPan = useCallback((panX: number, panY: number) => {
-    setProject(prev => ({ ...prev, panX, panY }));
+    setProject(prev => {
+      const updated = { ...prev, panX, panY };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const toggleVisibility = useCallback((id: string) => {
-    setVisibilityMap(prev => ({ ...prev, [id]: !prev[id] }));
+    setVisibilityMap(prev => {
+      const updated = { ...prev, [id]: !prev[id] };
+      saveVisibilityMap(updated);
+      return updated;
+    });
   }, []);
 
   const toggleLocked = useCallback((id: string) => {
-    setLockedMap(prev => ({ ...prev, [id]: !prev[id] }));
+    setLockedMap(prev => {
+      const updated = { ...prev, [id]: !prev[id] };
+      saveLockedMap(updated);
+      return updated;
+    });
   }, []);
 
   const isVisible = useCallback((id: string) => {
@@ -133,18 +316,24 @@ export function useAnnotationStore() {
       
       [newAnnotations[index], newAnnotations[newIndex]] = [newAnnotations[newIndex], newAnnotations[index]];
       
-      return { ...prev, annotations: newAnnotations };
+      const updated = { ...prev, annotations: newAnnotations };
+      saveProjectToStorage(updated);
+      return updated;
     });
   }, []);
 
   const setDefaultPointSettings = useCallback((settings: Partial<DefaultPointSettings>) => {
-    setProject(prev => ({
-      ...prev,
-      defaultPointSettings: {
-        ...prev.defaultPointSettings,
-        ...settings,
-      } as DefaultPointSettings,
-    }));
+    setProject(prev => {
+      const updated = {
+        ...prev,
+        defaultPointSettings: {
+          ...prev.defaultPointSettings,
+          ...settings,
+        } as DefaultPointSettings,
+      };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const createPoint = useCallback((x: number, y: number): AnnotationPoint => {
@@ -179,8 +368,18 @@ export function useAnnotationStore() {
     };
   }, []);
 
-  const createShape = useCallback((shapeType: Shape["shapeType"], x: number, y: number, width: number, height: number): Shape => {
-    return {
+  const createShape = useCallback((
+    shapeType: Shape["shapeType"], 
+    x: number, 
+    y: number, 
+    width: number, 
+    height: number,
+    startX?: number,
+    startY?: number,
+    endX?: number,
+    endY?: number
+  ): Shape => {
+    const shape: Shape = {
       id: crypto.randomUUID(),
       type: "shape",
       shapeType,
@@ -192,10 +391,22 @@ export function useAnnotationStore() {
       strokeWidth: 2,
       fillOpacity: 0,
     };
+    
+    // For lines and arrows, store the actual endpoints
+    if ((shapeType === "line" || shapeType === "arrow") && 
+        startX !== undefined && startY !== undefined && 
+        endX !== undefined && endY !== undefined) {
+      shape.startX = startX;
+      shape.startY = startY;
+      shape.endX = endX;
+      shape.endY = endY;
+    }
+    
+    return shape;
   }, []);
 
   const clearProject = useCallback(() => {
-    setProject({
+    const newProject: Project = {
       id: crypto.randomUUID(),
       name: "Untitled Project",
       annotations: [],
@@ -206,15 +417,20 @@ export function useAnnotationStore() {
         size: 32,
         color: "#3b82f6",
       },
-    });
+    };
+    setProject(newProject);
+    saveProjectToStorage(newProject);
     setNextPointNumber(1);
     setSelectedAnnotationId(null);
     setVisibilityMap({});
+    saveVisibilityMap({});
     setLockedMap({});
+    saveLockedMap({});
   }, []);
 
   const importProject = useCallback((importedProject: Project) => {
     setProject(importedProject);
+    saveProjectToStorage(importedProject);
     setNextPointNumber(
       Math.max(1, ...importedProject.annotations
         .filter(a => a.type === "point")
@@ -228,7 +444,9 @@ export function useAnnotationStore() {
       newLockedMap[a.id] = false;
     });
     setVisibilityMap(newVisibilityMap);
+    saveVisibilityMap(newVisibilityMap);
     setLockedMap(newLockedMap);
+    saveLockedMap(newLockedMap);
   }, []);
 
   return {
@@ -241,6 +459,10 @@ export function useAnnotationStore() {
     selectedAnnotation,
     nextPointNumber,
     setBackgroundImage,
+    updateBackgroundSettings,
+    isEditingBackground,
+    setIsEditingBackground,
+    toggleEditingBackground,
     addAnnotation,
     updateAnnotation,
     deleteAnnotation,

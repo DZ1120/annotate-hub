@@ -7,12 +7,16 @@ export function ThemeToggle() {
     if (typeof window !== "undefined") {
       return document.documentElement.classList.contains("dark");
     }
-    return false;
+    return true; // Default to dark (Figma style)
   });
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
-    if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    // Default to dark mode if no preference saved (Figma style)
+    if (saved === "light") {
+      document.documentElement.classList.remove("dark");
+      setIsDark(false);
+    } else {
       document.documentElement.classList.add("dark");
       setIsDark(true);
     }
@@ -29,10 +33,11 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
+      className="h-8 w-8"
       onClick={toggle}
       data-testid="button-theme-toggle"
     >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
     </Button>
   );
 }
