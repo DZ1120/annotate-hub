@@ -4,6 +4,7 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  base: "/annotate-hub/",
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

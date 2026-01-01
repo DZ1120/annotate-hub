@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/DZ1120/annotate-hub)
 
-[Live Demo](https://annotatehub.com) | [Features](#features) | [Installation](#installation) | [Usage](#usage)
+[Live Demo](https://DZ1120.github.io/annotate-hub/) | [Features](#features) | [Installation](#installation) | [Usage](#usage)
 
 </div>
 
