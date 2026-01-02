@@ -297,7 +297,7 @@ export function Toolbar({ store, onUpload, onChangeBackground, onExport, onImpor
                     <span className="font-medium">Developed by:</span> Yihang Zhu
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Version:</span> 1.0.0
+                    <span className="font-medium">Version:</span> 1.1.0
                   </p>
                   <p className="text-sm">
                     <span className="font-medium">GitHub:</span>{" "}

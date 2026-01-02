@@ -6,6 +6,7 @@ import { PropertiesPanel } from "@/components/properties-panel";
 import { AnnotationCanvas } from "@/components/annotation-canvas";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, Annotation, AnnotationPoint } from "@shared/schema";
+import { PdfPageSelector } from "@/components/pdf-page-selector";
 
 export default function Home() {
   const store = useAnnotationStore();
@@ -60,6 +61,9 @@ export default function Home() {
     resizeRef.current = { startX: e.clientX, startWidth: leftPanelWidth };
   }, [leftPanelWidth]);
 
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfSelectorOpen, setPdfSelectorOpen] = useState(false);
+
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -71,16 +75,18 @@ export default function Home() {
       };
       reader.readAsDataURL(file);
     } else if (file.type === "application/pdf") {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        store.setBackgroundImage(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      setPdfFile(file);
+      setPdfSelectorOpen(true);
     }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  }, [store]);
+
+  const handlePdfPageSelect = useCallback((imageDataUrl: string) => {
+    store.setBackgroundImage(imageDataUrl);
+    setPdfFile(null);
   }, [store]);
 
   const triggerUpload = useCallback(() => {
@@ -119,7 +125,7 @@ export default function Home() {
           imageUrls: images
         };
       } else if (a.type === "text") {
-        const t = a as Annotation; // Assuming Annotation type has these properties
+        const t = a as import("@shared/schema").TextNote;
         return {
           ...base,
           x: t.x,
@@ -136,7 +142,7 @@ export default function Home() {
           borderColor: t.borderColor || "#e5e7eb"
         };
       } else if (a.type === "shape") {
-        const s = a as Annotation; // Assuming Annotation type has these properties
+        const s = a as import("@shared/schema").Shape;
         return {
           ...base,
           x: s.x,
@@ -1087,6 +1093,12 @@ export default function Home() {
           </div>
         )}
       </div>
+      <PdfPageSelector
+        file={pdfFile}
+        open={pdfSelectorOpen}
+        onOpenChange={setPdfSelectorOpen}
+        onSelect={handlePdfPageSelect}
+      />
     </div>
   );
 }

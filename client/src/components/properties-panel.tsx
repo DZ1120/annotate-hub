@@ -34,34 +34,34 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || selectedAnnotation.type !== "point") return;
-    
-    const point = selectedAnnotation as AnnotationPoint;
-    const existingImages = point.attachedImageUrls || (point.attachedImageUrl ? [point.attachedImageUrl] : []);
-    
-    // Read all selected files
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const newImageUrl = event.target?.result as string;
-        // Get current images again in case of concurrent updates
-        const currentPoint = store.project.annotations.find(a => a.id === selectedAnnotation.id) as AnnotationPoint | undefined;
-        if (currentPoint) {
-          const currentImages = currentPoint.attachedImageUrls || (currentPoint.attachedImageUrl ? [currentPoint.attachedImageUrl] : []);
-          updateAnnotation(selectedAnnotation.id, {
-            attachedImageUrls: [...currentImages, newImageUrl],
-            attachedImageUrl: undefined, // Clear legacy field
-          });
-        }
-      };
-      reader.readAsDataURL(file);
+
+    // Read all selected files concurrently
+    const promises = Array.from(files).map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.readAsDataURL(file);
+      });
     });
-    
+
+    Promise.all(promises).then(newImageUrls => {
+      // Get current images again to ensure we have fresh state
+      const currentPoint = store.project.annotations.find(a => a.id === selectedAnnotation.id) as AnnotationPoint | undefined;
+      if (currentPoint) {
+        const currentImages = currentPoint.attachedImageUrls || (currentPoint.attachedImageUrl ? [currentPoint.attachedImageUrl] : []);
+        updateAnnotation(selectedAnnotation.id, {
+          attachedImageUrls: [...currentImages, ...newImageUrls],
+          attachedImageUrl: undefined, // Clear legacy field
+        });
+      }
+    });
+
     // Reset input
     if (imageInputRef.current) {
       imageInputRef.current.value = "";
     }
   };
-  
+
   const removeImage = (index: number) => {
     if (selectedAnnotation.type !== "point") return;
     const point = selectedAnnotation as AnnotationPoint;
@@ -145,7 +145,7 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
         <Label className="text-xs font-medium uppercase tracking-wide">
           Attached Images
         </Label>
-        
+
         {/* Display existing images */}
         {(() => {
           const images = point.attachedImageUrls || (point.attachedImageUrl ? [point.attachedImageUrl] : []);
@@ -190,12 +190,12 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
             >
               <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Click to upload images
+                Click to upload images<br />(Multiple allowed)
               </p>
             </div>
           );
         })()}
-        
+
         <input
           ref={imageInputRef}
           type="file"
