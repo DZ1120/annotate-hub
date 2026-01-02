@@ -60,7 +60,11 @@ export function Toolbar({ store, onUpload, onChangeBackground, onExport, onImpor
       <div className="flex items-center gap-2 flex-wrap">
         {/* Logo */}
         <div className="flex items-center gap-2 mr-1">
-          <img src="/logo.png" alt="AnnotateHub" className="h-8 w-8 rounded-full object-cover shadow-sm" />
+          <img
+            src={import.meta.env.MODE === "production" ? "/annotate-hub/logo.png" : "/logo.png"}
+            alt="AnnotateHub"
+            className="h-8 w-8 rounded-full object-cover shadow-sm"
+          />
           <span className="text-sm font-semibold tracking-tight hidden sm:inline">AnnotateHub</span>
         </div>
 
