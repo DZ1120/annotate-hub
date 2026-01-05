@@ -14,7 +14,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   const [isPanning, setIsPanning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
-  const [tempShape, setTempShape] = useState<{ 
+  const [tempShape, setTempShape] = useState<{
     x: number; y: number; width: number; height: number;
     // For lines/arrows: actual endpoints relative to bounding box
     startX?: number; startY?: number; endX?: number; endY?: number;
@@ -28,19 +28,19 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   const [rotateStart, setRotateStart] = useState<{ angle: number; startAngle: number } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [bgImageSize, setBgImageSize] = useState<{ width: number; height: number } | null>(null);
-  
+
   // Image preview states - supports multiple images
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [imagePreviewIndex, setImagePreviewIndex] = useState(0);
-  
+
   // Background editing states
   const [isDraggingBackground, setIsDraggingBackground] = useState(false);
   const [bgDragStart, setBgDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
-  
-  const { 
-    project, 
-    selectedTool, 
-    selectedAnnotationId, 
+
+  const {
+    project,
+    selectedTool,
+    selectedAnnotationId,
     setSelectedAnnotationId,
     addAnnotation,
     updateAnnotation,
@@ -61,22 +61,22 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   // Center background in viewport
   const centerBackground = useCallback(() => {
     if (!containerRef.current || !bgImageSize) return;
-    
+
     const container = containerRef.current.getBoundingClientRect();
     const imgWidth = bgImageSize.width * bgSettings.scale;
     const imgHeight = bgImageSize.height * bgSettings.scale;
-    
+
     // Calculate zoom to fit image with some padding (90% of viewport)
     const scaleX = (container.width * 0.9) / imgWidth;
     const scaleY = (container.height * 0.9) / imgHeight;
     const fitZoom = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
-    
+
     // Calculate pan to center the background (accounting for bgSettings.offset)
     const scaledWidth = imgWidth * fitZoom;
     const scaledHeight = imgHeight * fitZoom;
     const panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom;
     const panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
-    
+
     setZoom(fitZoom);
     setPan(panX, panY);
   }, [bgImageSize, bgSettings.scale, bgSettings.offsetX, bgSettings.offsetY, setZoom, setPan]);
@@ -120,7 +120,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    
+
     if (isEditingBackground) {
       // Zoom background image in edit mode
       const delta = e.deltaY > 0 ? -0.05 : 0.05;
@@ -129,25 +129,25 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     } else {
       // Visual zoom centered on mouse position
       if (!containerRef.current) return;
-      
+
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      
+
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       const oldZoom = project.zoom;
       const newZoom = Math.max(0.1, Math.min(5, oldZoom + delta));
-      
+
       // Calculate the world point under the mouse before zoom
       const worldX = (mouseX - project.panX) / oldZoom;
       const worldY = (mouseY - project.panY) / oldZoom;
-      
+
       // Calculate new pan to keep the same world point under the mouse
       // mouseX = worldX * newZoom + newPanX
       // newPanX = mouseX - worldX * newZoom
       const newPanX = mouseX - worldX * newZoom;
       const newPanY = mouseY - worldY * newZoom;
-      
+
       // Update zoom and pan together
       store.setProject(prev => ({
         ...prev,
@@ -172,7 +172,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
         return;
       }
     }
-    
+
     if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && isSpacePressed)) {
       setIsPanning(true);
       return;
@@ -215,7 +215,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       });
       return;
     }
-    
+
     if (isPanning) {
       setPan(project.panX + e.movementX, project.panY + e.movementY);
       return;
@@ -227,17 +227,17 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       if (annotation && (annotation.type === "shape" || annotation.type === "text")) {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        
+
         // World center position (includes background offset)
         const worldCenterX = bgSettings.offsetX + annotation.x + annotation.width / 2;
         const worldCenterY = bgSettings.offsetY + annotation.y + annotation.height / 2;
         // Convert to screen position
         const screenCenterX = worldCenterX * project.zoom + project.panX + rect.left;
         const screenCenterY = worldCenterY * project.zoom + project.panY + rect.top;
-        
+
         const angle = Math.atan2(e.clientY - screenCenterY, e.clientX - screenCenterX);
         const angleDeg = (angle * 180 / Math.PI) - rotateStart.startAngle + rotateStart.angle;
-        
+
         updateAnnotation(rotating.id, { rotation: angleDeg });
       }
       return;
@@ -246,7 +246,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     if (resizing && resizeStart) {
       const coords = getCanvasCoords(e);
       const annotation = resizeStart.annotation;
-      
+
       // Handle line and arrow endpoint dragging
       if (annotation.type === "shape" && (annotation.shapeType === "line" || annotation.shapeType === "arrow")) {
         if (resizing.handle === "start" || resizing.handle === "end") {
@@ -255,7 +255,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           let startY = annotation.y + (annotation.startY ?? annotation.height);
           let endX = annotation.x + (annotation.endX ?? annotation.width);
           let endY = annotation.y + (annotation.endY ?? 0);
-          
+
           // Update the dragged point
           if (resizing.handle === "start") {
             startX = coords.x;
@@ -264,37 +264,37 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
             endX = coords.x;
             endY = coords.y;
           }
-          
+
           // Calculate new bounding box
           const newX = Math.min(startX, endX);
           const newY = Math.min(startY, endY);
           const newWidth = Math.max(Math.abs(endX - startX), 1);
           const newHeight = Math.max(Math.abs(endY - startY), 1);
-          
+
           // Calculate relative endpoints
           const newStartX = startX - newX;
           const newStartY = startY - newY;
           const newEndX = endX - newX;
           const newEndY = endY - newY;
-          
-          updateAnnotation(resizing.id, { 
+
+          updateAnnotation(resizing.id, {
             x: newX, y: newY, width: newWidth, height: newHeight,
             startX: newStartX, startY: newStartY, endX: newEndX, endY: newEndY
           });
           return;
         }
       }
-      
+
       // Standard resize for rectangles, circles, text
       if (annotation.type === "shape" || annotation.type === "text") {
         const dx = coords.x - resizeStart.x;
         const dy = coords.y - resizeStart.y;
-        
+
         let newWidth = annotation.width;
         let newHeight = annotation.height;
         let newX = annotation.x;
         let newY = annotation.y;
-        
+
         if (resizing.handle.includes("e")) {
           newWidth = Math.max(20, annotation.width + dx);
         }
@@ -309,7 +309,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           newHeight = Math.max(20, annotation.height - dy);
           newY = annotation.y + dy;
         }
-        
+
         updateAnnotation(resizing.id, { x: newX, y: newY, width: newWidth, height: newHeight });
         setResizeStart({ ...resizeStart, x: coords.x, y: coords.y, annotation: { ...annotation, x: newX, y: newY, width: newWidth, height: newHeight } as Annotation });
       }
@@ -332,7 +332,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       const y = Math.min(drawStart.y, coords.y);
       const width = Math.abs(coords.x - drawStart.x);
       const height = Math.abs(coords.y - drawStart.y);
-      
+
       // For lines and arrows, track actual endpoints relative to bounding box
       const isLineOrArrow = selectedTool === "line" || selectedTool === "arrow";
       setTempShape({
@@ -355,7 +355,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       setBgDragStart(null);
       return;
     }
-    
+
     if (isPanning) {
       setIsPanning(false);
       return;
@@ -389,10 +389,10 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       } else if (tempShape.width > 5 || tempShape.height > 5) {
         const shapeType = selectedTool as Shape["shapeType"];
         const shape = createShape(
-          shapeType, 
-          tempShape.x, 
-          tempShape.y, 
-          Math.max(tempShape.width, 10), 
+          shapeType,
+          tempShape.x,
+          tempShape.y,
+          Math.max(tempShape.width, 10),
           Math.max(tempShape.height, 10),
           tempShape.startX,
           tempShape.startY,
@@ -412,9 +412,9 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     // Only deselect when clicking directly on canvas container (not on annotations)
     // and only when in select mode
     const target = e.target as HTMLElement;
-    const isCanvasClick = target === containerRef.current || 
-                          target.closest('[data-canvas-background]') !== null;
-    
+    const isCanvasClick = target === containerRef.current ||
+      target.closest('[data-canvas-background]') !== null;
+
     if (isCanvasClick && selectedTool === "select" && !isEditingBackground) {
       setSelectedAnnotationId(null);
       setEditingTextId(null);
@@ -423,15 +423,15 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
 
   const handleAnnotationMouseDown = useCallback((e: React.MouseEvent, annotation: Annotation) => {
     e.stopPropagation();
-    
+
     if (isEditingBackground) return;
     if (isLocked(annotation.id)) return;
     if (isSpacePressed) return;
-    
+
     const coords = getCanvasCoords(e);
     setSelectedAnnotationId(annotation.id);
     setHasDragged(false); // Reset drag flag on mouse down
-    
+
     if (selectedTool === "select") {
       setDraggedId(annotation.id);
       setDragOffset({
@@ -445,7 +445,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     e.stopPropagation();
     if (isLocked(annotation.id)) return;
     if (isEditingBackground) return;
-    
+
     const coords = getCanvasCoords(e);
     setResizing({ id: annotation.id, handle });
     setResizeStart({ x: coords.x, y: coords.y, annotation });
@@ -456,32 +456,32 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     if (isLocked(annotation.id)) return;
     if (isEditingBackground) return;
     if (annotation.type === "point") return;
-    
+
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
+
     // World center position (includes background offset)
     const worldCenterX = bgSettings.offsetX + annotation.x + (annotation.type === "shape" || annotation.type === "text" ? annotation.width / 2 : 0);
     const worldCenterY = bgSettings.offsetY + annotation.y + (annotation.type === "shape" || annotation.type === "text" ? annotation.height / 2 : 0);
     // Convert to screen position
     const screenCenterX = worldCenterX * project.zoom + project.panX + rect.left;
     const screenCenterY = worldCenterY * project.zoom + project.panY + rect.top;
-    
+
     const startAngle = Math.atan2(e.clientY - screenCenterY, e.clientX - screenCenterX) * 180 / Math.PI;
     const currentRotation = (annotation.type === "shape" || annotation.type === "text") ? (annotation.rotation || 0) : 0;
-    
+
     setRotating({ id: annotation.id });
     setRotateStart({ angle: currentRotation, startAngle });
   }, [isLocked, project.zoom, project.panX, project.panY, isEditingBackground]);
 
   const handlePointClick = useCallback((e: React.MouseEvent, annotation: Annotation) => {
     e.stopPropagation();
-    
+
     // Don't show image preview if we just dragged
     if (hasDragged) {
       return;
     }
-    
+
     if (annotation.type === "point" && selectedTool === "select" && !isEditingBackground) {
       // Get all images (support both legacy single and new multiple)
       const images: string[] = [];
@@ -490,7 +490,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       } else if (annotation.attachedImageUrl) {
         images.push(annotation.attachedImageUrl);
       }
-      
+
       if (images.length > 0) {
         setImagePreviewUrls(images);
         setImagePreviewIndex(0);
@@ -572,7 +572,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
 
     const rawWidth = annotation.type === "shape" || annotation.type === "text" ? annotation.width : 0;
     const scaledWidth = rawWidth * project.zoom;
-    
+
     return (
       <div
         className="absolute flex items-center justify-center cursor-grab active:cursor-grabbing"
@@ -587,7 +587,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
         <div className="w-5 h-5 rounded-full bg-primary border-2 border-white shadow-md flex items-center justify-center">
           <RotateCw className="w-3 h-3 text-white" />
         </div>
-        <div 
+        <div
           className="absolute w-0.5 bg-primary"
           style={{ height: 15, top: 20, left: "50%", transform: "translateX(-50%)" }}
         />
@@ -602,14 +602,14 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     if (isEditingBackground) return null;
 
     const handleSize = 10;
-    
+
     // For lines and arrows, only show handles at the two endpoints
     if (annotation.type === "shape" && (annotation.shapeType === "line" || annotation.shapeType === "arrow")) {
       const x1 = (annotation.startX ?? 0) * project.zoom;
       const y1 = (annotation.startY ?? annotation.height) * project.zoom;
       const x2 = (annotation.endX ?? annotation.width) * project.zoom;
       const y2 = (annotation.endY ?? 0) * project.zoom;
-      
+
       return (
         <>
           {/* Start point handle */}
@@ -637,7 +637,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
         </>
       );
     }
-    
+
     // For rectangles, circles, and text - use standard 8 corner handles
     const handles = ["nw", "ne", "sw", "se", "n", "s", "e", "w"];
     const width = annotation.width * project.zoom;
@@ -649,11 +649,11 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           let x = 0;
           let y = 0;
           let cursor = "";
-          
+
           if (handle.includes("w")) x = -handleSize / 2;
           if (handle.includes("e")) x = width - handleSize / 2;
           if (handle === "n" || handle === "s") x = width / 2 - handleSize / 2;
-          
+
           if (handle.includes("n")) y = -handleSize / 2;
           if (handle.includes("s")) y = height - handleSize / 2;
           if (handle === "e" || handle === "w") y = height / 2 - handleSize / 2;
@@ -696,7 +696,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   const renderAnnotation = (annotation: Annotation) => {
     if (!isVisible(annotation.id)) return null;
     if (isEditingBackground) return null;
-    
+
     const isSelected = annotation.id === selectedAnnotationId;
     const locked = isLocked(annotation.id);
     const rotation = (annotation.type === "shape" || annotation.type === "text") ? (annotation.rotation || 0) : 0;
@@ -704,7 +704,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
 
     if (annotation.type === "point") {
       const scaledSize = annotation.size * project.zoom;
-      
+
       return (
         <div
           key={annotation.id}
@@ -718,15 +718,15 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           onClick={(e) => handlePointClick(e, annotation)}
           data-testid={`point-${annotation.id}`}
         >
-          <div 
+          <div
             className="relative flex items-center justify-center rounded-full shadow-md transition-transform hover:scale-110"
-            style={{ 
-              width: scaledSize, 
+            style={{
+              width: scaledSize,
               height: scaledSize,
               backgroundColor: annotation.color,
             }}
           >
-            <span 
+            <span
               className="text-white font-bold select-none"
               style={{ fontSize: scaledSize * 0.4 }}
             >
@@ -737,10 +737,10 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
               if (imageCount === 0) return null;
               const badgeSize = Math.max(14, 12 * project.zoom);
               return (
-                <div 
+                <div
                   className="absolute -top-1 -right-1 bg-green-500 rounded-full border-2 border-white flex items-center justify-center"
-                  style={{ 
-                    minWidth: badgeSize, 
+                  style={{
+                    minWidth: badgeSize,
                     height: badgeSize,
                     padding: imageCount > 1 ? '0 3px' : 0,
                     fontSize: badgeSize * 0.6,
@@ -754,7 +754,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
             })()}
           </div>
           {isSelected && (
-            <div 
+            <div
               className="absolute rounded-full border-2 border-primary pointer-events-none"
               style={{
                 width: scaledSize + 8,
@@ -775,7 +775,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
       const scaledWidth = annotation.width * project.zoom;
       const scaledHeight = annotation.height * project.zoom;
       const scaledFontSize = annotation.fontSize * project.zoom;
-      
+
       return (
         <div
           key={annotation.id}
@@ -816,7 +816,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <div 
+              <div
                 className="p-2 whitespace-pre-wrap break-words"
                 style={{
                   fontSize: scaledFontSize,
@@ -840,7 +840,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     if (annotation.type === "shape") {
       const scaledWidth = annotation.width * project.zoom;
       const scaledHeight = annotation.height * project.zoom;
-      
+
       return (
         <div
           key={annotation.id}
@@ -904,21 +904,21 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
               const y1 = (annotation.startY ?? annotation.height / 2) * project.zoom;
               const x2 = (annotation.endX ?? annotation.width) * project.zoom;
               const y2 = (annotation.endY ?? annotation.height / 2) * project.zoom;
-              
+
               // Calculate arrow head
               const angle = Math.atan2(y2 - y1, x2 - x1);
               const arrowLen = 12;
               const arrowAngle = Math.PI / 6; // 30 degrees
-              
+
               const ax1 = x2 - arrowLen * Math.cos(angle - arrowAngle);
               const ay1 = y2 - arrowLen * Math.sin(angle - arrowAngle);
               const ax2 = x2 - arrowLen * Math.cos(angle + arrowAngle);
               const ay2 = y2 - arrowLen * Math.sin(angle + arrowAngle);
-              
+
               // Shorten line to not overlap arrow head
               const lineEndX = x2 - 8 * Math.cos(angle);
               const lineEndY = y2 - 8 * Math.sin(angle);
-              
+
               return (
                 <g>
                   <line
@@ -953,7 +953,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     const tempScreenPos = getScreenPos(tempShape.x, tempShape.y);
     const scaledWidth = tempShape.width * project.zoom;
     const scaledHeight = tempShape.height * project.zoom;
-    
+
     const style = {
       left: tempScreenPos.x,
       top: tempScreenPos.y,
@@ -1018,17 +1018,17 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           const y1 = (tempShape.startY ?? tempShape.height / 2) * project.zoom;
           const x2 = (tempShape.endX ?? tempShape.width) * project.zoom;
           const y2 = (tempShape.endY ?? tempShape.height / 2) * project.zoom;
-          
+
           // Calculate arrow head
           const angle = Math.atan2(y2 - y1, x2 - x1);
           const arrowLen = 12;
           const arrowAngle = Math.PI / 6;
-          
+
           const ax1 = x2 - arrowLen * Math.cos(angle - arrowAngle);
           const ay1 = y2 - arrowLen * Math.sin(angle - arrowAngle);
           const ax2 = x2 - arrowLen * Math.cos(angle + arrowAngle);
           const ay2 = y2 - arrowLen * Math.sin(angle + arrowAngle);
-          
+
           return (
             <g>
               <line
@@ -1065,35 +1065,35 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
   // Image preview popup component - centered with margin
   const renderImagePreview = () => {
     if (imagePreviewUrls.length === 0) return null;
-    
+
     const currentImage = imagePreviewUrls[imagePreviewIndex];
     const hasMultiple = imagePreviewUrls.length > 1;
-    
+
     const closePreview = () => {
       setImagePreviewUrls([]);
       setImagePreviewIndex(0);
     };
-    
+
     const prevImage = (e: React.MouseEvent) => {
       e.stopPropagation();
       setImagePreviewIndex((prev) => (prev - 1 + imagePreviewUrls.length) % imagePreviewUrls.length);
     };
-    
+
     const nextImage = (e: React.MouseEvent) => {
       e.stopPropagation();
       setImagePreviewIndex((prev) => (prev + 1) % imagePreviewUrls.length);
     };
-    
+
     return (
-      <div 
+      <div
         className="fixed inset-0 z-50 flex items-center justify-center p-8"
         onClick={closePreview}
         style={{ background: "rgba(0, 0, 0, 0.3)" }}
       >
-        <div 
+        <div
           className="relative bg-card rounded-lg shadow-2xl overflow-hidden"
-          style={{ 
-            maxWidth: "calc(100vw - 80px)", 
+          style={{
+            maxWidth: "calc(100vw - 80px)",
             maxHeight: "calc(100vh - 80px)",
           }}
           onClick={(e) => e.stopPropagation()}
@@ -1105,14 +1105,14 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           >
             ×
           </button>
-          
+
           {/* Image counter */}
           {hasMultiple && (
             <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 text-white text-sm z-10">
               {imagePreviewIndex + 1} / {imagePreviewUrls.length}
             </div>
           )}
-          
+
           {/* Previous button */}
           {hasMultiple && (
             <button
@@ -1122,7 +1122,7 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
               ‹
             </button>
           )}
-          
+
           {/* Next button */}
           {hasMultiple && (
             <button
@@ -1132,13 +1132,13 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
               ›
             </button>
           )}
-          
+
           <img
             src={currentImage}
             alt={`Attached image ${imagePreviewIndex + 1}`}
             className="block"
-            style={{ 
-              maxWidth: "calc(100vw - 80px)", 
+            style={{
+              maxWidth: "calc(100vw - 80px)",
               maxHeight: "calc(100vh - 80px)",
               objectFit: "contain",
             }}
@@ -1196,17 +1196,16 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
               } as React.CSSProperties}
               draggable={false}
               onLoad={handleBgImageLoad}
-              onDragStart={(e) => e.preventDefault()}
-              onSelectStart={(e) => e.preventDefault()}
-              onContextMenu={(e) => e.preventDefault()}
+              onDragStart={(e: React.DragEvent) => e.preventDefault()}
+              onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
             />
           </div>
         )}
-        
+
         {/* Annotations layer */}
         {project.backgroundImage && project.annotations.map(renderAnnotation)}
         {project.backgroundImage && renderTempShape()}
-        
+
         {/* Upload placeholder when no background */}
         {!project.backgroundImage && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -1231,13 +1230,13 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
             </div>
           </div>
         )}
-        
+
         {isSpacePressed && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-card/95 backdrop-blur-sm px-3 py-1.5 rounded text-xs text-muted-foreground border border-border/60 shadow-lg z-50">
             Drag to pan
           </div>
         )}
-        
+
         {isEditingBackground && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-primary backdrop-blur-sm px-4 py-2 rounded text-xs text-primary-foreground shadow-lg flex items-center gap-3 z-50">
             <span className="font-medium">Editing Background</span>

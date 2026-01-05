@@ -12,6 +12,9 @@ export const annotationPointSchema = z.object({
   attachedImageUrl: z.string().optional(), // Legacy: single image
   attachedImageUrls: z.array(z.string()).optional(), // New: multiple images
   rotation: z.number().default(0),
+  // Map Mode Support
+  lat: z.number().optional(),
+  lng: z.number().optional(),
 });
 
 export const textNoteSchema = z.object({
@@ -19,6 +22,9 @@ export const textNoteSchema = z.object({
   type: z.literal("text"),
   x: z.number(),
   y: z.number(),
+  // Map Mode Support
+  lat: z.number().optional(),
+  lng: z.number().optional(),
   width: z.number().default(200),
   height: z.number().default(100),
   content: z.string().default(""),
@@ -39,6 +45,9 @@ export const shapeSchema = z.object({
   shapeType: z.enum(["rectangle", "circle", "line", "arrow"]),
   x: z.number(),
   y: z.number(),
+  // Map Mode Support
+  lat: z.number().optional(),
+  lng: z.number().optional(),
   width: z.number(),
   height: z.number(),
   // For lines and arrows: store actual endpoints (startX,startY) to (endX,endY)
@@ -77,12 +86,16 @@ export const defaultPointSettingsSchema = z.object({
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string().default("Untitled Project"),
+  mode: z.enum(["canvas", "map"]).default("canvas"),
   backgroundImage: z.string().optional(),
   backgroundSettings: backgroundSettingsSchema.optional(),
   annotations: z.array(annotationSchema).default([]),
   zoom: z.number().default(1),
   panX: z.number().default(0),
   panY: z.number().default(0),
+  // Map Mode Global Settings
+  mapCenter: z.object({ lat: z.number(), lng: z.number() }).optional(),
+  mapZoom: z.number().optional(),
   defaultPointSettings: defaultPointSettingsSchema.optional(),
 });
 

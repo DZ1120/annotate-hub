@@ -5,11 +5,24 @@
 **A powerful image annotation tool for adding interactive points, text notes, and geometric shapes to images and PDFs.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/DZ1120/annotate-hub)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/DZ1120/annotate-hub)
 
 [Live Demo](https://DZ1120.github.io/annotate-hub/) | [Features](#features) | [Installation](#installation) | [Usage](#usage)
 
 </div>
+
+## 📝 Release Notes
+
+### v1.2.0 (2025-01-05)
+- **Map Mode**: New mode for placing annotation markers on interactive geographical maps (OpenStreetMap).
+- **Address Search**: Geocoding support to search and navigate to locations by address.
+- **Map Export**: Export map projects as standalone HTML files with interactive Leaflet maps.
+- **Mode Switching**: Seamless toggle between Canvas Mode and Map Mode.
+
+### v1.1.0 (2025-01-02)
+- **Multi-Image Attachments**: Support for attaching multiple images to a single annotation point with batch upload and gallery view.
+- **PDF Background Support**: Direct PDF import capability with an integrated page selector to convert PDF pages into high-resolution background images.
+- **UI Enhancements**: Improved file upload experience and property panel interactions.
 
 ## ✨ Features
 

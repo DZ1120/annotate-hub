@@ -84,6 +84,7 @@ export function useAnnotationStore() {
   const defaultProject: Project = storedProject || {
     id: crypto.randomUUID(),
     name: "Untitled Project",
+    mode: "canvas",
     annotations: [],
     zoom: 1,
     panX: 0,
@@ -95,25 +96,25 @@ export function useAnnotationStore() {
   };
 
   const [project, setProject] = useState<Project>(defaultProject);
-  
+
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
-  
+
   // Calculate next point number
   const calculateNextPointNumber = useCallback((annotations: Annotation[]) => {
     const pointAnnotations = annotations.filter(a => a.type === "point") as AnnotationPoint[];
     if (pointAnnotations.length === 0) return 1;
     return Math.max(...pointAnnotations.map(p => p.number)) + 1;
   }, []);
-  
-  const [nextPointNumber, setNextPointNumber] = useState(() => 
+
+  const [nextPointNumber, setNextPointNumber] = useState(() =>
     calculateNextPointNumber(defaultProject.annotations)
   );
-  
-  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>(() => 
+
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>(() =>
     loadVisibilityMap()
   );
-  const [lockedMap, setLockedMap] = useState<Record<string, boolean>>(() => 
+  const [lockedMap, setLockedMap] = useState<Record<string, boolean>>(() =>
     loadLockedMap()
   );
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -158,8 +159,8 @@ export function useAnnotationStore() {
 
   const setBackgroundImage = useCallback((url: string) => {
     setProject(prev => {
-      const updated = { 
-        ...prev, 
+      const updated = {
+        ...prev,
         backgroundImage: url,
         backgroundSettings: {
           rotation: 0,
@@ -229,7 +230,7 @@ export function useAnnotationStore() {
     setProject(prev => {
       const updated = {
         ...prev,
-        annotations: prev.annotations.map(a => 
+        annotations: prev.annotations.map(a =>
           a.id === id ? { ...a, ...updates } as Annotation : a
         ),
       };
@@ -308,14 +309,14 @@ export function useAnnotationStore() {
     setProject(prev => {
       const index = prev.annotations.findIndex(a => a.id === id);
       if (index === -1) return prev;
-      
+
       const newAnnotations = [...prev.annotations];
       const newIndex = direction === "up" ? index - 1 : index + 1;
-      
+
       if (newIndex < 0 || newIndex >= newAnnotations.length) return prev;
-      
+
       [newAnnotations[index], newAnnotations[newIndex]] = [newAnnotations[newIndex], newAnnotations[index]];
-      
+
       const updated = { ...prev, annotations: newAnnotations };
       saveProjectToStorage(updated);
       return updated;
@@ -336,9 +337,9 @@ export function useAnnotationStore() {
     });
   }, []);
 
-  const createPoint = useCallback((x: number, y: number): AnnotationPoint => {
+  const createPoint = useCallback((x: number, y: number, lat?: number, lng?: number): AnnotationPoint => {
     const defaults = project.defaultPointSettings || { size: 32, color: "#3b82f6" };
-    return {
+    const point: AnnotationPoint = {
       id: crypto.randomUUID(),
       type: "point",
       x,
@@ -346,7 +347,18 @@ export function useAnnotationStore() {
       number: nextPointNumber,
       size: defaults.size,
       color: defaults.color,
+      rotation: 0,
     };
+
+    if (lat !== undefined && lng !== undefined) {
+      point.lat = lat;
+      point.lng = lng;
+    }
+
+    // Ensure strict type compliance
+    (point as any).rotation = 0;
+
+    return point;
   }, [nextPointNumber, project.defaultPointSettings]);
 
   const createTextNote = useCallback((x: number, y: number, width?: number, height?: number): TextNote => {
@@ -365,14 +377,15 @@ export function useAnnotationStore() {
       backgroundOpacity: 1,
       borderColor: "#e5e7eb",
       borderWidth: 1,
+      rotation: 0,
     };
   }, []);
 
   const createShape = useCallback((
-    shapeType: Shape["shapeType"], 
-    x: number, 
-    y: number, 
-    width: number, 
+    shapeType: Shape["shapeType"],
+    x: number,
+    y: number,
+    width: number,
     height: number,
     startX?: number,
     startY?: number,
@@ -390,18 +403,19 @@ export function useAnnotationStore() {
       strokeColor: "#3b82f6",
       strokeWidth: 2,
       fillOpacity: 0,
+      rotation: 0,
     };
-    
+
     // For lines and arrows, store the actual endpoints
-    if ((shapeType === "line" || shapeType === "arrow") && 
-        startX !== undefined && startY !== undefined && 
-        endX !== undefined && endY !== undefined) {
+    if ((shapeType === "line" || shapeType === "arrow") &&
+      startX !== undefined && startY !== undefined &&
+      endX !== undefined && endY !== undefined) {
       shape.startX = startX;
       shape.startY = startY;
       shape.endX = endX;
       shape.endY = endY;
     }
-    
+
     return shape;
   }, []);
 
@@ -409,6 +423,7 @@ export function useAnnotationStore() {
     const newProject: Project = {
       id: crypto.randomUUID(),
       name: "Untitled Project",
+      mode: "canvas",
       annotations: [],
       zoom: 1,
       panX: 0,
@@ -445,8 +460,23 @@ export function useAnnotationStore() {
     });
     setVisibilityMap(newVisibilityMap);
     saveVisibilityMap(newVisibilityMap);
-    setLockedMap(newLockedMap);
     saveLockedMap(newLockedMap);
+  }, []);
+
+  const setMode = useCallback((mode: "canvas" | "map") => {
+    setProject(prev => {
+      const updated = { ...prev, mode };
+      saveProjectToStorage(updated);
+      return updated;
+    });
+  }, []);
+
+  const setMapSettings = useCallback((center: { lat: number; lng: number }, zoom: number) => {
+    setProject(prev => {
+      const updated = { ...prev, mapCenter: center, mapZoom: zoom };
+      saveProjectToStorage(updated);
+      return updated;
+    });
   }, []);
 
   return {
@@ -480,6 +510,8 @@ export function useAnnotationStore() {
     moveAnnotation,
     setDefaultPointSettings,
     importProject,
+    setMode,
+    setMapSettings,
   };
 }
 

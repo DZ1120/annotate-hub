@@ -7,6 +7,8 @@ import { AnnotationCanvas } from "@/components/annotation-canvas";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, Annotation, AnnotationPoint } from "@shared/schema";
 import { PdfPageSelector } from "@/components/pdf-page-selector";
+import { MapCanvas } from "@/components/map-canvas";
+import { Map as MapIcon, Image as ImageIcon } from "lucide-react";
 
 export default function Home() {
   const store = useAnnotationStore();
@@ -101,6 +103,207 @@ export default function Home() {
     const themeClass = isDark ? "dark" : "";
 
     // Build annotations data for JavaScript
+    // Map Mode Export
+    if (project.mode === 'map') {
+      const mapPoints = project.annotations.filter(a => a.type === 'point' && a.lat !== undefined && a.lng !== undefined);
+      const pointsJson = JSON.stringify(mapPoints, null, 2);
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${project.name} - Map View</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""><\/script>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    .custom-popup .leaflet-popup-content-wrapper { border-radius: 8px; }
+    
+    /* Image Popup Overlay - Same as Canvas Mode */
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      box-sizing: border-box;
+    }
+    .overlay.active { display: flex; }
+    .popup {
+      position: relative;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      overflow: hidden;
+      max-width: calc(100vw - 80px);
+      max-height: calc(100vh - 80px);
+    }
+    .popup-img { 
+      display: block;
+      max-width: calc(100vw - 80px);
+      max-height: calc(100vh - 80px);
+      object-fit: contain;
+    }
+    .close-btn {
+      position: absolute; top: 12px; right: 12px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.6); color: white; border: none;
+      font-size: 20px; font-weight: 300; cursor: pointer; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .close-btn:hover { background: rgba(0,0,0,0.8); }
+    .img-counter {
+      position: absolute; top: 12px; left: 12px;
+      padding: 4px 12px; border-radius: 16px;
+      background: rgba(0,0,0,0.6); color: white;
+      font-size: 13px; z-index: 10;
+    }
+    .nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(0,0,0,0.6); color: white; border: none;
+      font-size: 24px; font-weight: 300; cursor: pointer; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .nav-btn:hover { background: rgba(0,0,0,0.8); }
+    .nav-btn.prev { left: 12px; }
+    .nav-btn.next { right: 12px; }
+    
+    /* Marker popup image thumbnails */
+    .thumb-gallery { display: flex; gap: 5px; margin-top: 8px; overflow-x: auto; max-width: 200px; }
+    .thumb-img { height: 50px; width: 50px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+    .thumb-img:hover { border-color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <!-- Image Popup Overlay -->
+  <div class="overlay" id="overlay" onclick="closePopup()">
+    <div class="popup" id="popup" onclick="event.stopPropagation()">
+      <button class="close-btn" onclick="closePopup()">×</button>
+      <div class="img-counter" id="imgCounter" style="display:none;">1 / 1</div>
+      <button class="nav-btn prev" id="prevBtn" onclick="event.stopPropagation(); prevImage()" style="display:none;">‹</button>
+      <button class="nav-btn next" id="nextBtn" onclick="event.stopPropagation(); nextImage()" style="display:none;">›</button>
+      <img id="popupImg" class="popup-img" />
+    </div>
+  </div>
+
+  <script>
+    var map = L.map('map').setView([${project.mapCenter?.lat || 40.7128}, ${project.mapCenter?.lng || -74.0060}], ${project.mapZoom || 13});
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var points = ${pointsJson};
+    var currentImageUrls = [];
+    var currentImageIndex = 0;
+
+    // Image popup functions
+    function showImages(imageUrls) {
+      if (!imageUrls || imageUrls.length === 0) return;
+      currentImageUrls = imageUrls;
+      currentImageIndex = 0;
+      updateImagePopup();
+      document.getElementById('overlay').classList.add('active');
+    }
+
+    function updateImagePopup() {
+      var img = document.getElementById('popupImg');
+      var counter = document.getElementById('imgCounter');
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      
+      img.src = currentImageUrls[currentImageIndex];
+      img.onerror = function() { this.src = 'https://placehold.co/400x300?text=Image+Load+Error'; };
+      
+      var hasMultiple = currentImageUrls.length > 1;
+      counter.style.display = hasMultiple ? 'block' : 'none';
+      counter.innerText = (currentImageIndex + 1) + ' / ' + currentImageUrls.length;
+      prevBtn.style.display = hasMultiple ? 'flex' : 'none';
+      nextBtn.style.display = hasMultiple ? 'flex' : 'none';
+    }
+
+    function prevImage() {
+      currentImageIndex = (currentImageIndex - 1 + currentImageUrls.length) % currentImageUrls.length;
+      updateImagePopup();
+    }
+
+    function nextImage() {
+      currentImageIndex = (currentImageIndex + 1) % currentImageUrls.length;
+      updateImagePopup();
+    }
+
+    function closePopup() { 
+      document.getElementById('overlay').classList.remove('active');
+      currentImageUrls = [];
+      currentImageIndex = 0;
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) { 
+      if(e.key === 'Escape') closePopup();
+      if(currentImageUrls.length > 1) {
+        if(e.key === 'ArrowLeft') prevImage();
+        if(e.key === 'ArrowRight') nextImage();
+      }
+    });
+
+    // Create markers with popups
+    points.forEach(function(p) {
+      if (p.lat && p.lng) {
+        var marker = L.marker([p.lat, p.lng]).addTo(map);
+        var popupContent = "<b>Point " + p.number + "</b>";
+        if (p.label) popupContent += "<br>" + p.label;
+        
+        if (p.attachedImageUrls && p.attachedImageUrls.length > 0) {
+          var urlsJson = JSON.stringify(p.attachedImageUrls).replace(/'/g, "\\\\'");
+          popupContent += "<div class='thumb-gallery'>";
+          p.attachedImageUrls.forEach(function(url, i) {
+            popupContent += "<img src='" + url + "' class='thumb-img' onclick='showImages(" + urlsJson + ")' />";
+          });
+          popupContent += "</div>";
+        }
+        marker.bindPopup(popupContent, { maxWidth: 250 });
+      }
+    });
+
+    // Fit bounds to show all points
+    if (points.length > 0) {
+       var group = new L.featureGroup(points.map(function(p) { return L.marker([p.lat, p.lng]); }));
+       map.fitBounds(group.getBounds().pad(0.1));
+    }
+  <\/script>
+  
+  <!-- Project Data for Re-import -->
+  <script type="application/json" id="project-data">
+    ${JSON.stringify(project, null, 2)}
+  <\/script>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${project.name}-map-export.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Map Exported", description: "Saved as HTML file." });
+      return;
+    }
+
     const annotationsData = project.annotations.map((a, i) => {
       const base: Record<string, any> = {
         id: String(a.id),
@@ -1084,11 +1287,28 @@ export default function Home() {
           </div>
         </div>
 
-        <AnnotationCanvas store={store} onUploadClick={triggerUpload} />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1100] bg-card rounded-full border shadow-sm p-1 flex items-center gap-1">
+          <button
+            onClick={() => store.setMode("canvas")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${store.project.mode === "canvas" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            Canvas
+          </button>
+          <button
+            onClick={() => store.setMode("map")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${store.project.mode === "map" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+          >
+            <MapIcon className="h-4 w-4" />
+            Map
+          </button>
+        </div>
+
+        {store.project.mode === "map" ? <MapCanvas store={store} /> : <AnnotationCanvas store={store} onUploadClick={triggerUpload} />}
 
         {/* Properties panel is absolutely positioned to not affect canvas layout */}
         {store.selectedAnnotation && (
-          <div className="absolute top-0 right-0 h-full z-20">
+          <div className="absolute top-0 right-0 h-full z-[1050]">
             <PropertiesPanel store={store} />
           </div>
         )}
