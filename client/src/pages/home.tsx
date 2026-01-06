@@ -818,6 +818,12 @@ export default function Home() {
 
   <script>
     var annotations = ${annotationsJson};
+    var bgSettings = {
+      rotation: ${project.backgroundSettings?.rotation || 0},
+      scale: ${project.backgroundSettings?.scale || 1},
+      offsetX: ${project.backgroundSettings?.offsetX || 0},
+      offsetY: ${project.backgroundSettings?.offsetY || 0}
+    };
     var isMultiSelectMode = false;
     var selectedIds = new Set();
     var currentImageUrls = [];
@@ -877,19 +883,20 @@ export default function Home() {
       if (!bgImageSize.width) return;
       
       var container = mainArea.getBoundingClientRect();
-      var imgWidth = bgImageSize.width;
-      var imgHeight = bgImageSize.height;
+      // Account for background scale setting
+      var imgWidth = bgImageSize.width * bgSettings.scale;
+      var imgHeight = bgImageSize.height * bgSettings.scale;
       
       // Calculate zoom to fit with padding (90% of viewport)
       var scaleX = (container.width * 0.9) / imgWidth;
       var scaleY = (container.height * 0.9) / imgHeight;
       var fitZoom = Math.min(scaleX, scaleY, 1);
       
-      // Center the image
+      // Center the image (accounting for bgSettings offset)
       var scaledWidth = imgWidth * fitZoom;
       var scaledHeight = imgHeight * fitZoom;
-      panX = (container.width - scaledWidth) / 2;
-      panY = (container.height - scaledHeight) / 2;
+      panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom;
+      panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
       zoom = fitZoom;
       
       updateTransform();
@@ -897,7 +904,10 @@ export default function Home() {
     
     // Update background transform
     function updateTransform() {
-      bgContainer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoom + ')';
+      // Apply all transformations: translate, scale (including bgSettings.scale), and rotate
+      var totalScale = zoom * bgSettings.scale;
+      bgContainer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + totalScale + ') rotate(' + bgSettings.rotation + 'deg)';
+      bgContainer.style.transformOrigin = '0 0';
     }
     
     // Wheel zoom
@@ -1090,9 +1100,11 @@ export default function Home() {
         var a = annotations[j];
         if (!a.visible) continue;
         
-        // Convert annotation coords to screen coords
-        var screenX = a.x * zoom + panX;
-        var screenY = a.y * zoom + panY;
+        // Convert annotation coords to screen coords (accounting for bgSettings offset)
+        var worldX = bgSettings.offsetX + a.x;
+        var worldY = bgSettings.offsetY + a.y;
+        var screenX = worldX * zoom + panX;
+        var screenY = worldY * zoom + panY;
         
         if (a.type === 'point') {
           var scaledSize = a.size * zoom;
