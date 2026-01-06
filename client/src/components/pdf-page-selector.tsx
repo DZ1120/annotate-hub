@@ -39,7 +39,22 @@ export function PdfPageSelector({ file, open, onOpenChange, onSelect }: PdfPageS
 
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 1.5 }); // Good quality thumbnail
+
+                    // Calculate optimal scale based on page size
+                    // Get unscaled dimensions first
+                    const unscaledViewport = page.getViewport({ scale: 1.0 });
+                    const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
+
+                    // Define max dimension to prevent huge images
+                    // 4096px works well for large architectural drawings while maintaining quality
+                    const MAX_DIMENSION = 4096;
+
+                    // If page is larger than max, scale down to fit; otherwise use 1.5x for quality
+                    const renderScale = maxDim > MAX_DIMENSION
+                        ? (MAX_DIMENSION / maxDim)
+                        : 1.5;
+
+                    const viewport = page.getViewport({ scale: renderScale });
                     const canvas = document.createElement("canvas");
                     const context = canvas.getContext("2d");
                     canvas.height = viewport.height;
