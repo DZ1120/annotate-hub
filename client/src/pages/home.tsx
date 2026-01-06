@@ -883,20 +883,22 @@ export default function Home() {
       if (!bgImageSize.width) return;
       
       var container = mainArea.getBoundingClientRect();
-      // Account for background scale setting
-      var imgWidth = bgImageSize.width * bgSettings.scale;
-      var imgHeight = bgImageSize.height * bgSettings.scale;
+      // Use base image dimensions (bgSettings.scale will be applied in transform)
+      var imgWidth = bgImageSize.width;
+      var imgHeight = bgImageSize.height;
       
-      // Calculate zoom to fit with padding (90% of viewport)
-      var scaleX = (container.width * 0.9) / imgWidth;
-      var scaleY = (container.height * 0.9) / imgHeight;
+      // Calculate zoom to fit background + bgSettings.scale with padding (90% of viewport)
+      var effectiveWidth = imgWidth * bgSettings.scale;
+      var effectiveHeight = imgHeight * bgSettings.scale;
+      var scaleX = (container.width * 0.9) / effectiveWidth;
+      var scaleY = (container.height * 0.9) / effectiveHeight;
       var fitZoom = Math.min(scaleX, scaleY, 1);
       
-      // Center the image (accounting for bgSettings offset)
-      var scaledWidth = imgWidth * fitZoom;
-      var scaledHeight = imgHeight * fitZoom;
-      panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom;
-      panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
+      // Center the image (offset multiplied by zoom to match editor logic)
+      var scaledWidth = effectiveWidth * fitZoom;
+      var scaledHeight = effectiveHeight * fitZoom;
+      panX = (container.width - scaledWidth) / 2 + bgSettings.offsetX * fitZoom;
+      panY = (container.height - scaledHeight) / 2 + bgSettings.offsetY * fitZoom;
       zoom = fitZoom;
       
       updateTransform();
