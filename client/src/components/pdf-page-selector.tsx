@@ -45,17 +45,14 @@ export function PdfPageSelector({ file, open, onOpenChange, onSelect }: PdfPageS
                     const unscaledViewport = page.getViewport({ scale: 1.0 });
                     const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
 
-                    // Define max dimension to prevent huge images and improve performance
-                    // Reduced from 4096 to 2500 for better device compatibility and export reliability
-                    const MAX_DIMENSION = 2500;
+                    // Define max dimension to prevent huge images
+                    // 4096px works well for large architectural drawings while maintaining quality
+                    const MAX_DIMENSION = 4096;
 
-                    // Dynamic scaling:
-                    // 1. Default to 1.5x for crisp text on standard documents
-                    // 2. But strictly cap the final dimension at MAX_DIMENSION
-                    let renderScale = 1.5;
-                    if (maxDim * renderScale > MAX_DIMENSION) {
-                        renderScale = MAX_DIMENSION / maxDim;
-                    }
+                    // If page is larger than max, scale down to fit; otherwise use 1.5x for quality
+                    const renderScale = maxDim > MAX_DIMENSION
+                        ? (MAX_DIMENSION / maxDim)
+                        : 1.5;
 
                     const viewport = page.getViewport({ scale: renderScale });
                     const canvas = document.createElement("canvas");
