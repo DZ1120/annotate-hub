@@ -875,13 +875,27 @@ export default function Home() {
       bgImageSize.width = bgImg.naturalWidth;
       bgImageSize.height = bgImg.naturalHeight;
       
-      // -- Reference Dimension Scaling --
-      // Compare current image width with the editor's reference width
-      // If different, scale all coordinates and sizes to match the background
-      /* REVERTED Reference Scaling logic - keeping simple strict coordinate match */
-      // Only applying strict saved view state now
+      // -- Matched-Zoom Approach --
+      // Use the saved editor zoom, but recalculate pan to center in THIS container
+      // This ensures annotation/background scale ratio is preserved
       
-      // Apply the saved transform immediately - do NOT recalculate center
+      var container = mainArea.getBoundingClientRect();
+      var effectiveWidth = bgImageSize.width * bgSettings.scale;
+      var effectiveHeight = bgImageSize.height * bgSettings.scale;
+      var scaledWidth = effectiveWidth * zoom;  // zoom is the saved editor zoom
+      var scaledHeight = effectiveHeight * zoom;
+      
+      // Recalculate pan to center image in THIS container (different from editor)
+      panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * zoom;
+      panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * zoom;
+      
+      console.log('[EXPORT] Matched-Zoom Init:', {
+        savedZoom: zoom,
+        container: { width: container.width, height: container.height },
+        scaledImage: { width: scaledWidth, height: scaledHeight },
+        recalculatedPan: { panX: panX, panY: panY }
+      });
+      
       updateTransform();
       render();
     };
