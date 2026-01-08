@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AnnotationStore } from "@/lib/annotation-store";
 import type { AnnotationPoint, TextNote, Shape } from "@shared/schema";
+import { compressImages } from "@/lib/image-utils";
 
 interface PropertiesPanelProps {
   store: AnnotationStore;
@@ -31,30 +32,28 @@ export function PropertiesPanel({ store }: PropertiesPanelProps) {
 
   const locked = isLocked(selectedAnnotation.id);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || selectedAnnotation.type !== "point") return;
 
-    // Read all selected files concurrently
-    const promises = Array.from(files).map(file => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target?.result as string);
-        reader.readAsDataURL(file);
-      });
-    });
+    try {
+      // Compress all images before storing
+      console.log(`Compressing ${files.length} image(s)...`);
+      const compressedImageUrls = await compressImages(Array.from(files));
 
-    Promise.all(promises).then(newImageUrls => {
       // Get current images again to ensure we have fresh state
       const currentPoint = store.project.annotations.find(a => a.id === selectedAnnotation.id) as AnnotationPoint | undefined;
       if (currentPoint) {
         const currentImages = currentPoint.attachedImageUrls || (currentPoint.attachedImageUrl ? [currentPoint.attachedImageUrl] : []);
         updateAnnotation(selectedAnnotation.id, {
-          attachedImageUrls: [...currentImages, ...newImageUrls],
+          attachedImageUrls: [...currentImages, ...compressedImageUrls],
           attachedImageUrl: undefined, // Clear legacy field
         });
       }
-    });
+    } catch (error) {
+      console.error('Failed to compress images:', error);
+      alert('Failed to upload images. Please try again.');
+    }
 
     // Reset input
     if (imageInputRef.current) {
