@@ -1252,13 +1252,8 @@ export default function Home() {
       }
     });
     
-    // Initialize if image already loaded
-    if (bgImg.complete && bgImg.naturalWidth) {
-      bgImageSize.width = bgImg.naturalWidth;
-      bgImageSize.height = bgImg.naturalHeight;
-      centerBackground();
-      render();
-    }
+    // NOTE: Cached image handling is done in initializeExport() above
+    // Do NOT call centerBackground() here as it would overwrite saved zoom/pan values
   </script>
   
   <!-- Project Data for Re-import -->
