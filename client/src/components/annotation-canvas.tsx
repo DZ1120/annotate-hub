@@ -1183,7 +1183,6 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
           >
             <img
               ref={bgImageRef}
-              id="editor-bg-image"
               src={project.backgroundImage}
               alt="Background"
               className={`shadow-2xl transition-shadow block ${isEditingBackground ? "ring-4 ring-primary ring-opacity-50 cursor-move" : ""}`}

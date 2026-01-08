@@ -98,11 +98,6 @@ export default function Home() {
   const handleExport = useCallback(() => {
     const { project } = store;
 
-    // Capture the natural width of the image currently in the editor
-    // This serves as the "Ground Truth" for coordinate scaling
-    const editorImg = document.getElementById('editor-bg-image') as HTMLImageElement;
-    const editorNaturalWidth = editorImg?.naturalWidth || 0;
-
     // Detect current theme
     const isDark = document.documentElement.classList.contains("dark");
     const themeClass = isDark ? "dark" : "";
@@ -822,7 +817,6 @@ export default function Home() {
   </div>
 
   <script>
-    var editorRefWidth = ${editorNaturalWidth};
     var annotations = ${annotationsJson};
     var bgSettings = {
       rotation: ${project.backgroundSettings?.rotation || 0},
@@ -880,33 +874,6 @@ export default function Home() {
     bgImg.onload = function() {
       bgImageSize.width = bgImg.naturalWidth;
       bgImageSize.height = bgImg.naturalHeight;
-      
-      // -- Reference Dimension Scaling --
-      // Compare current image width with the editor's reference width
-      // If different, scale all coordinates and sizes to match the background
-      if (editorRefWidth > 0 && bgImageSize.width > 0) {
-        var ratio = bgImageSize.width / editorRefWidth;
-        // Float precision tollerance check
-        if (Math.abs(ratio - 1) > 0.001) {
-             // Apply scale correction to Global Settings
-             bgSettings.offsetX *= ratio;
-             bgSettings.offsetY *= ratio;
-             
-             // Apply scale correction to All Annotations
-             for (var i = 0; i < annotations.length; i++) {
-                var a = annotations[i];
-                a.x *= ratio;
-                a.y *= ratio;
-                if (a.width) a.width *= ratio;
-                if (a.height) a.height *= ratio;
-                if (a.size) a.size *= ratio;
-                if (a.fontSize) a.fontSize *= ratio;
-                if (a.strokeWidth) a.strokeWidth *= ratio;
-                if (a.borderWidth) a.borderWidth *= ratio;
-             }
-        }
-      }
-      
       centerBackground();
       render();
     };
