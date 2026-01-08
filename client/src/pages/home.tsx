@@ -103,6 +103,15 @@ export default function Home() {
     const editorContainerWidth = editorCanvas?.clientWidth || 1200;
     const editorContainerHeight = editorCanvas?.clientHeight || 800;
 
+    // DEBUG: Log all export-time values
+    console.log('[EDITOR] handleExport DEBUG:', {
+      editorContainer: { width: editorContainerWidth, height: editorContainerHeight },
+      projectZoom: project.zoom,
+      projectPan: { panX: project.panX, panY: project.panY },
+      bgSettings: project.backgroundSettings,
+      firstAnnotation: project.annotations[0] ? { x: project.annotations[0].x, y: project.annotations[0].y } : null
+    });
+
     // Detect current theme
     const isDark = document.documentElement.classList.contains("dark");
     const themeClass = isDark ? "dark" : "";
