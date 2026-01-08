@@ -801,11 +801,9 @@ export default function Home() {
 
   <div class="main-area" id="mainArea">
     <div class="bg-container" id="bgContainer">
-      <div id="imgWrapper" style="position: relative; display: inline-block;">
-        <img src="${project.backgroundImage}" class="bg-img" id="bgImg" draggable="false" />
-        <div id="annoCont" style="position: absolute; inset: 0; pointer-events: none;"></div>
-      </div>
+      <img src="${project.backgroundImage}" class="bg-img" id="bgImg" draggable="false" />
     </div>
+    <div id="annoCont"></div>
   </div>
 
   <div class="overlay" id="overlay" onclick="closePopup()">
@@ -1100,69 +1098,42 @@ export default function Home() {
        var cont = document.getElementById('annoCont');
        var html = '';
        
-      // Render using percentage-based positioning relative to the natural image size
-      // We must account for bgSettings.scale because a.x/y are in the scaled coordinate space
-      var natW = bgImageSize.width;
-      var natH = bgImageSize.height;
-      var bgScale = bgSettings.scale || 1;
-      
-      // Safety check to prevent division by zero
-      if (natW === 0 || natH === 0) return;
-      
-      for (var j = 0; j < annotations.length; j++) {
+       for (var j = 0; j < annotations.length; j++) {
         var a = annotations[j];
         if (!a.visible) continue;
         
-        // Calculate normalized coordinates (unscaling the background scale)
-        // a.x is relative to the "visual" top-left if scale was 1. 
-        // If background is scaled, we need to divide by scale to get percentage of natural dimension?
-        // Let's trace: x is pixels. If image is scaled 2x, x=100 is 100px visual.
-        // We want left: 100px visual. Container is 2x. So internal left must be 50px.
-        // So normalized = val / bgScale.
-        // Percentage = (normalized / natD) * 100.
-        
-        var leftPct = (a.x / bgScale / natW) * 100;
-        var topPct = (a.y / bgScale / natH) * 100;
-        
-        // Common styles
-        var commonStyle = 'left:' + leftPct + '%;top:' + topPct + '%;position:absolute;pointer-events:auto;';
+        // Convert annotation coords to screen coords (accounting for bgSettings offset)
+        var worldX = bgSettings.offsetX + a.x;
+        var worldY = bgSettings.offsetY + a.y;
+        var screenX = worldX * zoom + panX;
+        var screenY = worldY * zoom + panY;
         
         if (a.type === 'point') {
-          // Point size: fixed pixels? or scaled?
-          // If we want point to look same size relative to image, we scale it.
-          // Inside scaled container, px value will be scaled.
-          // So if we put width: (size/bgScale) px, it will be rendered as (size) px visual.
-          var sizePx = a.size / bgScale;
-          var fontSizePx = (a.size * 0.4) / bgScale;
-          
-          html += '<div class="anno anno-point" onclick="showImage(\\'' + a.id + '\\')" style="' + commonStyle + 'width:' + sizePx + 'px;height:' + sizePx + 'px;background:' + a.color + ';font-size:' + fontSizePx + 'px;transform:translate(-50%,-50%)">' +
+          var scaledSize = a.size * zoom;
+          html += '<div class="anno anno-point" onclick="showImage(\\'' + a.id + '\\')" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledSize + 'px;height:' + scaledSize + 'px;background:' + a.color + ';font-size:' + (scaledSize*0.4) + 'px;transform:translate(-50%,-50%)">' +
             a.number +
             (a.hasImage ? '<div class="has-img-indicator"></div>' : '') +
           '</div>';
         } else if (a.type === 'text') {
-           var wPx = a.width / bgScale;
-           var hPx = a.height / bgScale;
-           var fSize = a.fontSize / bgScale;
-           var bWidth = (a.borderWidth || 1) / bgScale;
-           
-           html += '<div class="anno anno-text" style="' + commonStyle + 'width:' + wPx + 'px;min-height:' + hPx + 'px;background:' + a.backgroundColor + ';opacity:' + a.backgroundOpacity + ';border:' + bWidth + 'px solid ' + a.borderColor + ';color:' + a.textColor + ';font-size:' + fSize + 'px;font-weight:' + a.fontWeight + '">' + (a.content || '') + '</div>';
+           var scaledWidth = a.width * zoom;
+           var scaledHeight = a.height * zoom;
+           var scaledFontSize = a.fontSize * zoom;
+           html += '<div class="anno anno-text" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledWidth + 'px;min-height:' + scaledHeight + 'px;background:' + a.backgroundColor + ';opacity:' + a.backgroundOpacity + ';border:' + a.borderWidth + 'px solid ' + a.borderColor + ';color:' + a.textColor + ';font-size:' + scaledFontSize + 'px;font-weight:' + a.fontWeight + '">' + (a.content || '') + '</div>';
         } else if (a.type === 'shape') {
-           var wPx = a.width / bgScale;
-           var hPx = a.height / bgScale;
-           var strW = a.strokeWidth / bgScale;
-           
-           html += '<div class="anno anno-shape" style="' + commonStyle + 'width:' + wPx + 'px;height:' + hPx + 'px"><svg width="100%" height="100%">';
+           var scaledW = a.width * zoom;
+           var scaledH = a.height * zoom;
+           html += '<div class="anno anno-shape" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledW + 'px;height:' + scaledH + 'px"><svg width="100%" height="100%">';
            
            if (a.shapeType === 'rectangle') {
-             html += '<rect x="' + (strW/2) + '" y="' + (strW/2) + '" width="' + Math.max(0, wPx - strW) + '" height="' + Math.max(0, hPx - strW) + '" stroke="' + a.strokeColor + '" stroke-width="' + strW + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
+             html += '<rect x="' + (a.strokeWidth/2) + '" y="' + (a.strokeWidth/2) + '" width="' + Math.max(0, scaledW - a.strokeWidth) + '" height="' + Math.max(0, scaledH - a.strokeWidth) + '" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
            } else if (a.shapeType === 'circle') {
-             html += '<ellipse cx="' + (wPx/2) + '" cy="' + (hPx/2) + '" rx="' + Math.max(0, (wPx - strW)/2) + '" ry="' + Math.max(0, (hPx - strW)/2) + '" stroke="' + a.strokeColor + '" stroke-width="' + strW + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
+             html += '<ellipse cx="' + (scaledW/2) + '" cy="' + (scaledH/2) + '" rx="' + Math.max(0, (scaledW - a.strokeWidth)/2) + '" ry="' + Math.max(0, (scaledH - a.strokeWidth)/2) + '" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
            }
            
            html += '</svg></div>';
         }
-      }
-      cont.innerHTML = html;
+       }
+       cont.innerHTML = html;
     }
 
     function showImage(id) {
