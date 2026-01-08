@@ -77,6 +77,18 @@ export function AnnotationCanvas({ store, onUploadClick }: AnnotationCanvasProps
     const panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom;
     const panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
 
+    // DEBUG: Print all values for comparison with export
+    console.log('[EDITOR] centerBackground DEBUG:', {
+      container: { width: container.width, height: container.height },
+      bgImageSize: { width: bgImageSize.width, height: bgImageSize.height },
+      bgSettings: { scale: bgSettings.scale, offsetX: bgSettings.offsetX, offsetY: bgSettings.offsetY },
+      imgWidth, imgHeight,
+      scaleX, scaleY,
+      fitZoom,
+      scaledWidth, scaledHeight,
+      panX, panY
+    });
+
     setZoom(fitZoom);
     setPan(panX, panY);
   }, [bgImageSize, bgSettings.scale, bgSettings.offsetX, bgSettings.offsetY, setZoom, setPan]);

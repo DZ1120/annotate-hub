@@ -910,6 +910,18 @@ export default function Home() {
       panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
       zoom = fitZoom;
       
+      // DEBUG: Print all values for comparison with editor
+      console.log('[EXPORT] centerBackground DEBUG:', {
+        container: { width: container.width, height: container.height },
+        bgImageSize: { width: bgImageSize.width, height: bgImageSize.height },
+        bgSettings: bgSettings,
+        effectiveWidth: effectiveWidth, effectiveHeight: effectiveHeight,
+        scaleX: scaleX, scaleY: scaleY,
+        fitZoom: fitZoom,
+        scaledWidth: scaledWidth, scaledHeight: scaledHeight,
+        panX: panX, panY: panY
+      });
+      
       updateTransform();
     }
     
@@ -1119,6 +1131,20 @@ export default function Home() {
         var worldY = bgSettings.offsetY + a.y;
         var screenX = worldX * zoom + panX;
         var screenY = worldY * zoom + panY;
+        
+        // DEBUG: Log first annotation position for comparison
+        if (j === 0) {
+          console.log('[EXPORT] renderCanvas - First Annotation DEBUG:', {
+            annotationId: a.id,
+            annotationType: a.type,
+            rawCoords: { x: a.x, y: a.y },
+            bgOffsets: { offsetX: bgSettings.offsetX, offsetY: bgSettings.offsetY },
+            worldCoords: { worldX: worldX, worldY: worldY },
+            zoom: zoom,
+            panX: panX, panY: panY,
+            screenCoords: { screenX: screenX, screenY: screenY }
+          });
+        }
         
         if (a.type === 'point') {
           var scaledSize = a.size * zoom;
