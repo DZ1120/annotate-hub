@@ -888,13 +888,18 @@ export default function Home() {
       var imgHeight = bgImageSize.height;
       
       // Calculate zoom to fit background + bgSettings.scale with padding (90% of viewport)
-      var effectiveWidth = imgWidth * bgSettings.scale;
-      var effectiveHeight = imgHeight * bgSettings.scale;
-      var scaleX = (container.width * 0.9) / effectiveWidth;
-      var scaleY = (container.height * 0.9) / effectiveHeight;
-      var fitZoom = Math.min(scaleX, scaleY, 1);
+      // var effectiveWidth = imgWidth * bgSettings.scale;
+      // var effectiveHeight = imgHeight * bgSettings.scale;
+      // var scaleX = (container.width * 0.9) / effectiveWidth;
+      // var scaleY = (container.height * 0.9) / effectiveHeight;
+      // var fitZoom = Math.min(scaleX, scaleY, 1);
+      
+      // USER REQUEST: Remove fitZoom calculation to test if it fixes projection
+      var fitZoom = 1;
       
       // Center the image (offset multiplied by zoom to match editor logic)
+      var effectiveWidth = imgWidth * bgSettings.scale;
+      var effectiveHeight = imgHeight * bgSettings.scale;
       var scaledWidth = effectiveWidth * fitZoom;
       var scaledHeight = effectiveHeight * fitZoom;
       panX = (container.width - scaledWidth) / 2 + bgSettings.offsetX * fitZoom;
