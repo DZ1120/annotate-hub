@@ -98,6 +98,11 @@ export default function Home() {
   const handleExport = useCallback(() => {
     const { project } = store;
 
+    // Capture the editor's canvas container dimensions for exact replication
+    const editorCanvas = document.querySelector('[data-testid="annotation-canvas"]') as HTMLElement;
+    const editorContainerWidth = editorCanvas?.clientWidth || 1200;
+    const editorContainerHeight = editorCanvas?.clientHeight || 800;
+
     // Detect current theme
     const isDark = document.documentElement.classList.contains("dark");
     const themeClass = isDark ? "dark" : "";
@@ -799,7 +804,7 @@ export default function Home() {
     </div>
   </div>
 
-  <div class="main-area" id="mainArea">
+  <div class="main-area" id="mainArea" style="width: ${editorContainerWidth}px; height: ${editorContainerHeight}px;">
     <div class="bg-container" id="bgContainer">
       <img src="${project.backgroundImage}" class="bg-img" id="bgImg" draggable="false" />
     </div>
@@ -875,25 +880,14 @@ export default function Home() {
       bgImageSize.width = bgImg.naturalWidth;
       bgImageSize.height = bgImg.naturalHeight;
       
-      // -- Matched-Zoom Approach --
-      // Use the saved editor zoom, but recalculate pan to center in THIS container
-      // This ensures annotation/background scale ratio is preserved
+      // -- Fixed Container Approach --
+      // Container size is fixed to match editor's dimensions exactly
+      // So we use the saved zoom/pan values directly without recalculation
       
-      var container = mainArea.getBoundingClientRect();
-      var effectiveWidth = bgImageSize.width * bgSettings.scale;
-      var effectiveHeight = bgImageSize.height * bgSettings.scale;
-      var scaledWidth = effectiveWidth * zoom;  // zoom is the saved editor zoom
-      var scaledHeight = effectiveHeight * zoom;
-      
-      // Recalculate pan to center image in THIS container (different from editor)
-      panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * zoom;
-      panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * zoom;
-      
-      console.log('[EXPORT] Matched-Zoom Init:', {
+      console.log('[EXPORT] Fixed Container Init:', {
+        containerSize: { width: mainArea.clientWidth, height: mainArea.clientHeight },
         savedZoom: zoom,
-        container: { width: container.width, height: container.height },
-        scaledImage: { width: scaledWidth, height: scaledHeight },
-        recalculatedPan: { panX: panX, panY: panY }
+        savedPan: { panX: panX, panY: panY }
       });
       
       updateTransform();
