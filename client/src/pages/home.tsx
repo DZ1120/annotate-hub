@@ -829,10 +829,10 @@ export default function Home() {
     var currentImageUrls = [];
     var currentImageIndex = 0;
     
-    // Zoom and pan state
-    var zoom = 1;
-    var panX = 0;
-    var panY = 0;
+    // Zoom and pan state - Initialize with Saved View State
+    var zoom = ${project.zoom};
+    var panX = ${project.panX};
+    var panY = ${project.panY};
     var isPanning = false;
     var lastMouseX = 0;
     var lastMouseY = 0;
@@ -874,7 +874,15 @@ export default function Home() {
     bgImg.onload = function() {
       bgImageSize.width = bgImg.naturalWidth;
       bgImageSize.height = bgImg.naturalHeight;
-      centerBackground();
+      
+      // -- Reference Dimension Scaling --
+      // Compare current image width with the editor's reference width
+      // If different, scale all coordinates and sizes to match the background
+      /* REVERTED Reference Scaling logic - keeping simple strict coordinate match */
+      // Only applying strict saved view state now
+      
+      // Apply the saved transform immediately - do NOT recalculate center
+      updateTransform();
       render();
     };
     
