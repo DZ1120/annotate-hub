@@ -894,11 +894,12 @@ export default function Home() {
       var scaleY = (container.height * 0.9) / effectiveHeight;
       var fitZoom = Math.min(scaleX, scaleY, 1);
       
-      // Center the image (offset multiplied by zoom to match editor logic)
+      // Center the image - SUBTRACT offset to match editor behavior
+      // Editor: panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom
       var scaledWidth = effectiveWidth * fitZoom;
       var scaledHeight = effectiveHeight * fitZoom;
-      panX = (container.width - scaledWidth) / 2 + bgSettings.offsetX * fitZoom;
-      panY = (container.height - scaledHeight) / 2 + bgSettings.offsetY * fitZoom;
+      panX = (container.width - scaledWidth) / 2 - bgSettings.offsetX * fitZoom;
+      panY = (container.height - scaledHeight) / 2 - bgSettings.offsetY * fitZoom;
       zoom = fitZoom;
       
       updateTransform();
@@ -907,8 +908,11 @@ export default function Home() {
     // Update background transform
     function updateTransform() {
       // Apply all transformations: translate, scale (including bgSettings.scale), and rotate
+      // Include offset in translate to match editor behavior
       var totalScale = zoom * bgSettings.scale;
-      bgContainer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + totalScale + ') rotate(' + bgSettings.rotation + 'deg)';
+      var translateX = panX + bgSettings.offsetX * zoom;
+      var translateY = panY + bgSettings.offsetY * zoom;
+      bgContainer.style.transform = 'translate(' + translateX + 'px, ' + translateY + 'px) scale(' + totalScale + ') rotate(' + bgSettings.rotation + 'deg)';
       bgContainer.style.transformOrigin = '0 0';
     }
     
