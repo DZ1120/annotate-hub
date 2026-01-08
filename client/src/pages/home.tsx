@@ -801,11 +801,9 @@ export default function Home() {
 
   <div class="main-area" id="mainArea">
     <div class="bg-container" id="bgContainer">
-      <div id="imgWrapper" style="position: relative; display: inline-block;">
-        <img src="${project.backgroundImage}" class="bg-img" id="bgImg" draggable="false" style="display: block;" />
-        <div id="annoCont" style="position: absolute; inset: 0; pointer-events: none; overflow: visible;"></div>
-      </div>
+      <img src="${project.backgroundImage}" class="bg-img" id="bgImg" draggable="false" />
     </div>
+    <div id="annoCont"></div>
   </div>
 
   <div class="overlay" id="overlay" onclick="closePopup()">
@@ -1128,51 +1126,46 @@ export default function Home() {
         var a = annotations[j];
         if (!a.visible) continue;
         
-        // Percentage-based positioning relative to image natural dimensions
-        // This ensures annotations align correctly regardless of container size or zoom
-        var pctX = (a.x / bgImageSize.width) * 100;
-        var pctY = (a.y / bgImageSize.height) * 100;
-        
-        // For sizes, we use percentage of image width to maintain proportions
-        // This way, annotation sizes scale with the image
-        var sizePctW = function(px) { return (px / bgImageSize.width) * 100; };
-        var sizePctH = function(px) { return (px / bgImageSize.height) * 100; };
+        // Convert annotation coords to screen coords (accounting for bgSettings offset)
+        var worldX = bgSettings.offsetX + a.x;
+        var worldY = bgSettings.offsetY + a.y;
+        var screenX = worldX * zoom + panX;
+        var screenY = worldY * zoom + panY;
         
         // DEBUG: Log first annotation position for comparison
         if (j === 0) {
-          console.log('[EXPORT] renderCanvas - Percentage Positioning DEBUG:', {
+          console.log('[EXPORT] renderCanvas - First Annotation DEBUG:', {
             annotationId: a.id,
+            annotationType: a.type,
             rawCoords: { x: a.x, y: a.y },
-            bgImageSize: bgImageSize,
-            percentages: { pctX: pctX, pctY: pctY }
+            bgOffsets: { offsetX: bgSettings.offsetX, offsetY: bgSettings.offsetY },
+            worldCoords: { worldX: worldX, worldY: worldY },
+            zoom: zoom,
+            panX: panX, panY: panY,
+            screenCoords: { screenX: screenX, screenY: screenY }
           });
         }
         
-        // Common style for percentage positioning
-        var baseStyle = 'position:absolute;left:' + pctX + '%;top:' + pctY + '%;pointer-events:auto;';
-        
         if (a.type === 'point') {
-          // Point size as percentage of image width for proportional scaling
-          var sizePct = sizePctW(a.size);
-          var fontSizePct = sizePctW(a.size * 0.4);
-          html += '<div class="anno anno-point" onclick="showImage(\\'' + a.id + '\\')" style="' + baseStyle + 'width:' + sizePct + '%;height:' + sizePct + '%;background:' + a.color + ';font-size:' + fontSizePct + 'vw;transform:translate(-50%,-50%)">' +
+          var scaledSize = a.size * zoom;
+          html += '<div class="anno anno-point" onclick="showImage(\\'' + a.id + '\\')" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledSize + 'px;height:' + scaledSize + 'px;background:' + a.color + ';font-size:' + (scaledSize*0.4) + 'px;transform:translate(-50%,-50%)">' +
             a.number +
             (a.hasImage ? '<div class="has-img-indicator"></div>' : '') +
           '</div>';
         } else if (a.type === 'text') {
-           var wPct = sizePctW(a.width);
-           var hPct = sizePctH(a.height);
-           var fSizePct = sizePctW(a.fontSize);
-           html += '<div class="anno anno-text" style="' + baseStyle + 'width:' + wPct + '%;min-height:' + hPct + '%;background:' + a.backgroundColor + ';opacity:' + a.backgroundOpacity + ';border:' + a.borderWidth + 'px solid ' + a.borderColor + ';color:' + a.textColor + ';font-size:' + fSizePct + 'vw;font-weight:' + a.fontWeight + '">' + (a.content || '') + '</div>';
+           var scaledWidth = a.width * zoom;
+           var scaledHeight = a.height * zoom;
+           var scaledFontSize = a.fontSize * zoom;
+           html += '<div class="anno anno-text" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledWidth + 'px;min-height:' + scaledHeight + 'px;background:' + a.backgroundColor + ';opacity:' + a.backgroundOpacity + ';border:' + a.borderWidth + 'px solid ' + a.borderColor + ';color:' + a.textColor + ';font-size:' + scaledFontSize + 'px;font-weight:' + a.fontWeight + '">' + (a.content || '') + '</div>';
         } else if (a.type === 'shape') {
-           var wPct = sizePctW(a.width);
-           var hPct = sizePctH(a.height);
-           html += '<div class="anno anno-shape" style="' + baseStyle + 'width:' + wPct + '%;height:' + hPct + '%"><svg width="100%" height="100%" preserveAspectRatio="none">';
+           var scaledW = a.width * zoom;
+           var scaledH = a.height * zoom;
+           html += '<div class="anno anno-shape" style="left:' + screenX + 'px;top:' + screenY + 'px;width:' + scaledW + 'px;height:' + scaledH + 'px"><svg width="100%" height="100%">';
            
            if (a.shapeType === 'rectangle') {
-             html += '<rect x="0" y="0" width="100%" height="100%" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
+             html += '<rect x="' + (a.strokeWidth/2) + '" y="' + (a.strokeWidth/2) + '" width="' + Math.max(0, scaledW - a.strokeWidth) + '" height="' + Math.max(0, scaledH - a.strokeWidth) + '" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
            } else if (a.shapeType === 'circle') {
-             html += '<ellipse cx="50%" cy="50%" rx="50%" ry="50%" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
+             html += '<ellipse cx="' + (scaledW/2) + '" cy="' + (scaledH/2) + '" rx="' + Math.max(0, (scaledW - a.strokeWidth)/2) + '" ry="' + Math.max(0, (scaledH - a.strokeWidth)/2) + '" stroke="' + a.strokeColor + '" stroke-width="' + a.strokeWidth + '" fill="' + (a.fillOpacity > 0 ? (a.fillColor || a.strokeColor) : 'none') + '" fill-opacity="' + a.fillOpacity + '" />';
            }
            
            html += '</svg></div>';
