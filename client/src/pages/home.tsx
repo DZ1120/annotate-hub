@@ -876,7 +876,9 @@ export default function Home() {
     var mainArea = document.getElementById('mainArea');
     var bgContainer = document.getElementById('bgContainer');
     
-    bgImg.onload = function() {
+    console.log('[EXPORT] Script initialized. Waiting for image...');
+    
+    function initializeExport() {
       bgImageSize.width = bgImg.naturalWidth;
       bgImageSize.height = bgImg.naturalHeight;
       
@@ -886,13 +888,22 @@ export default function Home() {
       
       console.log('[EXPORT] Fixed Container Init:', {
         containerSize: { width: mainArea.clientWidth, height: mainArea.clientHeight },
+        bgImageSize: bgImageSize,
         savedZoom: zoom,
         savedPan: { panX: panX, panY: panY }
       });
       
       updateTransform();
       render();
-    };
+    }
+    
+    bgImg.onload = initializeExport;
+    
+    // Handle already-loaded (cached) images
+    if (bgImg.complete && bgImg.naturalWidth) {
+      console.log('[EXPORT] Image already loaded (cached)');
+      initializeExport();
+    }
     
     // Center background in viewport
     function centerBackground() {
